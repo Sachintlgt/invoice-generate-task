@@ -10,7 +10,9 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test tests/calculations.test.js tests/services.test.js tests/http.test.js tests/email.test.js tests/pdf.test.js tests/email-history.test.js tests/editor-save.test.js",
-    "test:network": "node --test tests/api.test.js"
+    "test:network": "node --test tests/api.test.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "dotenv": "^17.2.3",
@@ -19,5 +21,8 @@
     "helmet": "^8.1.0",
     "nodemailer": "^10.0.10",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "prettier": "3.8.3"
   }
 }

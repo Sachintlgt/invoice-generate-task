@@ -94,3 +94,9 @@ A failed invoice load blocks saving instead of silently creating a replacement. 
 Quantity accepts **whole numbers only, from 0 to 1,000,000** (including zero). Values such as `1.5`, `1.0` and `1e2` are rejected rather than rounded. Unit price and fixed discount accept two decimal places; tax percentage accepts four. Monetary outputs always show two decimal places. Whole units multiplied by integer cents give exact line totals; discount is applied before tax, and tax rounds half-up to cents.
 
 Old saved invoices with fractional quantities are not silently changed. Open them, correct the quantities to whole units and save before generating a new PDF or sending. Previously saved email artifacts remain unchanged.
+
+## Code style and comments
+
+Source files use two-space indentation and consistent formatting through Prettier and EditorConfig. Run `npm run format` to format changes and `npm run format:check` to verify them before review. Third-party vendored code, credentials and runtime invoice data are excluded from formatting.
+
+Functions have purpose-focused comments explaining their contracts and important behavior: exact currency arithmetic, whole-number quantities, saved-invoice identity, serialized writes, immutable email snapshots, PDF pagination, validation and keyboard-focus handling. Comments explain decisions and boundaries rather than repeating each line of code.

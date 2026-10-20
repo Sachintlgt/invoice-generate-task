@@ -10,22 +10,22 @@ An additional 1,000 deterministic whole-quantity invoices matched independent Py
 
 ## Current quantity and monetary contract
 
-| Field | Supported precision |
-| --- | --- |
-| Quantity | Whole numbers only, 0 to 1,000,000 |
-| Unit price in USD | Up to 2 decimal places |
+| Field                 | Supported precision                            |
+| --------------------- | ---------------------------------------------- |
+| Quantity              | Whole numbers only, 0 to 1,000,000             |
+| Unit price in USD     | Up to 2 decimal places                         |
 | Fixed discount in USD | Up to 2 decimal places; cannot exceed subtotal |
-| Tax percentage | Up to 4 decimal places |
-| Monetary totals | Always 2 decimal places |
+| Tax percentage        | Up to 4 decimal places                         |
+| Monetary totals       | Always 2 decimal places                        |
 
 Quantity fractions, decimal notation such as `1.0`, exponents, negatives, empty values and quantities above the maximum are rejected. Quantities are never silently rounded. Whole-unit quantity multiplied by price in integer cents gives an exact line total; sum lines, subtract discount, calculate percentage tax and round tax half-up.
 
-| Calculation | Verified result |
-| --- | --- |
-| 2 × $50.00, discount $10.00, tax 10% | $99.00 |
+| Calculation                            | Verified result                          |
+| -------------------------------------- | ---------------------------------------- |
+| 2 × $50.00, discount $10.00, tax 10%   | $99.00                                   |
 | 3 × $19.99, discount $0.01, tax 8.875% | Subtotal $59.97; tax $5.32; total $65.28 |
-| 1 × $0.05, tax 10% | Tax $0.01; total $0.06 |
-| 100 lines of 1 × $0.01 | Subtotal $1.00 |
+| 1 × $0.05, tax 10%                     | Tax $0.01; total $0.06                   |
+| 100 lines of 1 × $0.01                 | Subtotal $1.00                           |
 
 ## Browser verification of the current rule and saved-invoice workflow
 

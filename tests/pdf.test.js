@@ -1,8 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {invoicePDF,invoicePdfFilename} from '../src/invoice-pdf.js';
-const fixture=()=>({business:{name:'Studio North',email:'demo@example.com',address:'128 Fictional Street\nPortland, OR 97205'},customer:{name:'Demo Client',email:'client@example.com',address:'42 Example Avenue'},number:'QA-PDF',issueDate:'2026-10-20',dueDate:'2026-11-20',items:[{description:'Design and development',quantity:'2',unitPrice:'50.00'}],discount:'10',taxRate:'10',notes:'Test invoice; no payment required.',customFields:[{label:'Visible',value:'Reference',visible:true},{label:'Private',value:'HIDDEN-PDF-MARKER',visible:false}]});
-const countPages=pdf=>(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;
-test('server PDF is a complete one-page PDF and filename is safe',async()=>{const pdf=await invoicePDF(fixture());assert.equal(pdf.subarray(0,5).toString(),'%PDF-');assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));assert.equal(countPages(pdf),1);assert.equal(invoicePdfFilename('../../bad\r\nname'),'invoice-bad-name.pdf');});
-test('100 long invoice rows and long notes produce a complete multi-page PDF',async()=>{const i=fixture();i.items=Array.from({length:100},(_,n)=>({description:`ITEM-${String(n+1).padStart(3,'0')} `+'Delivery, development and testing. '.repeat(14),quantity:'3',unitPrice:'19.99'}));i.notes='Thank you. '.repeat(180);const pdf=await invoicePDF(i);assert.ok(countPages(pdf)>5);assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));});
-test('PDF creation rejects invalid totals before sending',async()=>{await assert.rejects(invoicePDF({...fixture(),discount:'101'}),/Discount cannot exceed subtotal/);});
+import { invoicePDF, invoicePdfFilename } from '../src/invoice-pdf.js';
+const fixture = () => ({
+  business: {
+    name: 'Studio North',
+    email: 'demo@example.com',
+    address: '128 Fictional Street\nPortland, OR 97205',
+  },
+  customer: { name: 'Demo Client', email: 'client@example.com', address: '42 Example Avenue' },
+  number: 'QA-PDF',
+  issueDate: '2026-10-20',
+  dueDate: '2026-11-20',
+  items: [{ description: 'Design and development', quantity: '2', unitPrice: '50.00' }],
+  discount: '10',
+  taxRate: '10',
+  notes: 'Test invoice; no payment required.',
+  customFields: [
+    { label: 'Visible', value: 'Reference', visible: true },
+    { label: 'Private', value: 'HIDDEN-PDF-MARKER', visible: false },
+  ],
+});
+const countPages = (pdf) => (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+test('server PDF is a complete one-page PDF and filename is safe', async () => {
+  const pdf = await invoicePDF(fixture());
+  assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));
+  assert.equal(countPages(pdf), 1);
+  assert.equal(invoicePdfFilename('../../bad\r\nname'), 'invoice-bad-name.pdf');
+});
+test('100 long invoice rows and long notes produce a complete multi-page PDF', async () => {
+  const i = fixture();
+  i.items = Array.from({ length: 100 }, (_, n) => ({
+    description:
+      `ITEM-${String(n + 1).padStart(3, '0')} ` + 'Delivery, development and testing. '.repeat(14),
+    quantity: '3',
+    unitPrice: '19.99',
+  }));
+  i.notes = 'Thank you. '.repeat(180);
+  const pdf = await invoicePDF(i);
+  assert.ok(countPages(pdf) > 5);
+  assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));
+});
+test('PDF creation rejects invalid totals before sending', async () => {
+  await assert.rejects(
+    invoicePDF({ ...fixture(), discount: '101' }),
+    /Discount cannot exceed subtotal/,
+  );
+});

@@ -6,11 +6,11 @@ After restarting the server, open **http://localhost:3000/email-logs**, or use *
 
 Every new email attempt stores its invoice snapshot, sender and recipient, subject, original creation time, status, safe error, HTML/plain-text body and PDF when generated. Records are private runtime files under `DATA_DIR/email-logs/`. JSON and PDF writes use temporary files followed by rename; writes are serialized within the single app process.
 
-| Status | Meaning |
-| --- | --- |
-| Sent | The SMTP provider accepted the configured test recipient; inbox delivery is not confirmed |
-| Failed | The attempt did not complete; a safe diagnostic is saved |
-| Preview | Local preview only; nothing was sent |
+| Status            | Meaning                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| Sent              | The SMTP provider accepted the configured test recipient; inbox delivery is not confirmed       |
+| Failed            | The attempt did not complete; a safe diagnostic is saved                                        |
+| Preview           | Local preview only; nothing was sent                                                            |
 | Pending / unknown | The attempt started but no final status is recorded; check provider history before another send |
 
 Dates are stored as ISO UTC timestamps and displayed in the browser's local time zone. Newest entries appear first. Summary counts and Previous/Next pagination cover the whole saved history.

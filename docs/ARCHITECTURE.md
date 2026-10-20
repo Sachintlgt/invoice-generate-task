@@ -6,20 +6,20 @@ The browser edits one invoice in memory and renders a live preview. It calls the
 
 ## Files and responsibilities
 
-| File | Responsibility |
-| --- | --- |
-| `server.js` | Small app factory, middleware, routing, safe errors, static serving and startup |
-| `src/config.js` | Environment defaults and validation |
-| `src/validation.js` | Bounded input schemas and date ordering |
-| `src/storage.js` | UUID path validation, JSON persistence and serialized atomic writes |
-| `src/email-history.js` | Atomic history records, immutable invoice snapshots, saved PDFs and legacy recovery |
-| `src/email.js` | SMTP, server-controlled recipient, PDF attachment and preview fallback |
-| `src/email-template.js` | Email-safe inline-styled HTML summary and plain-text alternative |
-| `src/invoice-pdf.js` | Server PDF layout, page breaks, repeated column headings and filenames |
-| `src/invoice-template.js` | Escaped invoice HTML and plain-text email |
-| `shared/calculations.js` | Exact arithmetic, rounding, safe conversion and USD formatting |
-| `public/app.js` | Form state, repeated fields, preview, API operations and error/status feedback |
-| `public/styles.css` | Layout, focus, responsive behavior and print rules |
+| File                      | Responsibility                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `server.js`               | Small app factory, middleware, routing, safe errors, static serving and startup     |
+| `src/config.js`           | Environment defaults and validation                                                 |
+| `src/validation.js`       | Bounded input schemas and date ordering                                             |
+| `src/storage.js`          | UUID path validation, JSON persistence and serialized atomic writes                 |
+| `src/email-history.js`    | Atomic history records, immutable invoice snapshots, saved PDFs and legacy recovery |
+| `src/email.js`            | SMTP, server-controlled recipient, PDF attachment and preview fallback              |
+| `src/email-template.js`   | Email-safe inline-styled HTML summary and plain-text alternative                    |
+| `src/invoice-pdf.js`      | Server PDF layout, page breaks, repeated column headings and filenames              |
+| `src/invoice-template.js` | Escaped invoice HTML and plain-text email                                           |
+| `shared/calculations.js`  | Exact arithmetic, rounding, safe conversion and USD formatting                      |
+| `public/app.js`           | Form state, repeated fields, preview, API operations and error/status feedback      |
+| `public/styles.css`       | Layout, focus, responsive behavior and print rules                                  |
 
 Only `public/`, the calculation module and the explicitly exposed invoice template are served. Configuration, invoice files and email previews have no static route.
 
