@@ -1,0 +1,23 @@
+{
+  "name": "folio-invoice",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/calculations.test.js tests/services.test.js tests/http.test.js tests/email.test.js tests/pdf.test.js tests/email-history.test.js tests/editor-save.test.js",
+    "test:network": "node --test tests/api.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "nodemailer": "^10.0.10",
+    "zod": "^4.1.12"
+  }
+}
