@@ -45,3 +45,9 @@ An empty, whitespace-only or omitted `discount` defaults to the string `"0"`. Ne
 | POST | `/api/email-logs/:id/resend` | New logged attempt using the saved snapshot and current configured recipient |
 
 Email-send responses include `logId` and `logUrl`. Resends share the original send rate limiter. Older previews without snapshots and pending/unknown attempts return 409 for resend. Invalid UUIDs or missing artifacts return 404. See [email history](EMAIL-LOGS.md).
+
+## Saved invoice list
+
+- `GET /api/invoices` returns `{items:[{id,number,customerName,issueDate,dueDate,updatedAt,totalCents,itemCount}]}` sorted by most recent save. Totals are integer cents. Full addresses, notes and custom fields are omitted from the list; use `GET /api/invoices/:id` when opening a selected invoice.
+- `GET /invoices` serves the Saved invoices page. The editor includes the same section.
+- Creating uses `POST /api/invoices`; editing always uses `PUT /api/invoices/:id`. A missing update ID returns 404 and never creates another invoice.

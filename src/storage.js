@@ -6,6 +6,15 @@ export function storage(directory) {
  let queue = Promise.resolve();
  const path = id => {if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) throw Object.assign(new Error('Invoice not found.'), {status:404}); return join(root, `${id}.json`);};
  return {
+ async list() {
+  await queue;
+  let files;try{files=await readdir(root);}catch(error){if(error.code==='ENOENT')return [];throw error;}
+  const invoices=await Promise.all(files.filter(file=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/.test(file)).map(async file=>{
+   const invoice=JSON.parse(await readFile(join(root,file),'utf8'));
+   return {id:file.slice(0,-5),number:invoice.number,customerName:invoice.customer.name,issueDate:invoice.issueDate,dueDate:invoice.dueDate,updatedAt:invoice.updatedAt,totalCents:invoice.totals.total,itemCount:invoice.items.length};
+  }));
+  return invoices.sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt))||a.id.localeCompare(b.id));
+ },
  async get(id) {try {return JSON.parse(await readFile(path(id), 'utf8'));} catch(e) {if(e.code==='ENOENT') throw Object.assign(new Error('Invoice not found.'),{status:404}); throw e;}},
  save(id, invoice) {const operation = queue.then(async()=>{await mkdir(root,{recursive:true});const target=path(id);
  // Check uniqueness inside the same queue as the write so concurrent requests

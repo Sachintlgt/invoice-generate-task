@@ -61,7 +61,7 @@ Invoices are private JSON files in `data/invoices/`. The directory is created au
 - Node test runner: calculation tests and actual HTTP API checks.
 - PDFKit standalone distribution: server-side PDF attachments, kept under `vendor/pdfkit/` with its MIT license and verified provenance. No browser installation or extra npm setup is required.
 
-Verification: **44 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
+Verification: **53 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
 
 See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SECURITY.md), [verification](docs/TESTING.md), and [submission notes](docs/SUBMISSION.md).
 
@@ -69,7 +69,7 @@ See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SE
 
 This is a single-instance interview demo. Authentication was explicitly excluded; anyone with access to the running app and an invoice URL/ID can read or overwrite that invoice. Use fictional data. Public production use needs access control, HTTPS, durable database storage, stronger abuse controls, operational monitoring and backups. JSON storage is not designed for multiple app processes or replicas. Concurrent edits use last-write-wins.
 
-Email contains an inline-styled HTML summary, a plain-text alternative and the complete invoice as a server-generated PDF attachment. Browser Print / Save as PDF remains available. Saved invoices can also be downloaded from `GET /api/invoices/:id/pdf`. The PDF attachment uses the same invoice data and calculation rules with a print-friendly server layout; it is not a screenshot of the browser preview. No invoice listing, automatic draft persistence, payments or native mobile app. SMTP/network errors show a safe message; inspect server logs/configuration for diagnosis.
+Email contains an inline-styled HTML summary, a plain-text alternative and the complete invoice as a server-generated PDF attachment. Browser Print / Save as PDF remains available. Saved invoices can also be downloaded from `GET /api/invoices/:id/pdf`. The PDF attachment uses the same invoice data and calculation rules with a print-friendly server layout; it is not a screenshot of the browser preview. No automatic draft persistence, payments or native mobile app. SMTP/network errors show a safe message; inspect server logs/configuration for diagnosis.
 
 ## Contributing
 
@@ -82,3 +82,9 @@ OpenAI Codex assisted with architecture discussion, implementation, documentatio
 Invoice numbers must be unique (ignoring surrounding spaces and letter case). Duplicate create/rename requests return HTTP 409; edit the existing saved invoice instead. Repeated Save, or Send after an unchanged Save, reuses the saved invoice without another write. Existing duplicate files are not deleted automatically.
 
 The editor remembers the last opened/saved invoice in this browser and resumes it from `/`. An explicit `?invoice=<id>` takes priority. Use **New invoice** (`/?new=1#editor`) to start a separate draft with a distinct suggested number. Existing invoices show **Save changes**. Local storage stores only the invoice ID.
+
+## Saved invoices
+
+The editor now includes a **Saved invoices** section. Open **http://localhost:3000/invoices** for the dedicated list. Search by invoice number, customer or ID and choose **Open and edit**. The editor clearly identifies the selected saved invoice and uses **Save changes** to update that same record, including added, edited or removed items. The list refreshes after saving. **New invoice** starts a separate draft.
+
+A failed invoice load blocks saving instead of silently creating a replacement. A repeated unchanged save clears the unsaved warning without another write. Older invoices with identical numbers remain separate records and are distinguished by their IDs. No existing invoice or email-history records were deleted. Restart the server after adding these API routes.

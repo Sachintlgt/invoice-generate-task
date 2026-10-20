@@ -16,6 +16,7 @@ const app=express(), store=storage(settings.DATA_DIR),history=emailHistory(setti
 app.disable('x-powered-by');app.use(helmet());app.use(express.json({limit:'128kb'}));
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');if(!['GET','HEAD'].includes(req.method)){const origin=req.get('origin');if(origin && origin!==`${req.protocol}://${req.get('host')}`) return res.status(403).json({error:'Cross-origin requests are not allowed.'});if(!req.is('application/json'))return res.status(415).json({error:'Use application/json.'});}next();});
 app.get('/api/config',(req,res)=>res.json({emailMode:settings.SMTP_HOST?'smtp':'preview',...(settings.TEST_EMAIL_TO?{testRecipient:settings.TEST_EMAIL_TO}:{})}));
+app.get('/api/invoices',async(req,res)=>res.json({items:await store.list()}));
 app.get('/api/invoices/:id/pdf',async(req,res)=>{const invoice=await store.get(req.params.id);res.type('application/pdf').attachment(invoicePdfFilename(invoice.number)).send(await invoicePDF(invoice));});
 app.get('/api/invoices/:id',async(req,res)=>res.json(await store.get(req.params.id)));
 async function save(req,res){const parsed=invoiceSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Please check the invoice fields.',issues:parsed.error.issues.map(i=>({path:i.path.join('.'),message:i.message}))});let totals;try{totals=calculate(parsed.data);}catch(e){return res.status(400).json({error:e.message});}const id=req.params.id||randomUUID();if(req.params.id)await store.get(id);const invoice={...parsed.data,id,totals,updatedAt:new Date().toISOString()};await store.save(id,invoice);res.status(req.params.id?200:201).json(invoice);}
@@ -28,6 +29,7 @@ app.get('/api/email-logs/:id/pdf',async(req,res)=>{const record=await history.ge
 app.get('/api/email-logs/:id/message',async(req,res)=>{const record=await history.get(req.params.id);if(!record.html)return res.status(404).send('Email body is unavailable.');res.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox").type('html').send(record.html);});
 app.post('/api/email-logs/:id/resend',emailLimit,async(req,res)=>{const record=await history.get(req.params.id);if(!record.invoice)return res.status(409).json({error:'This older preview has no invoice snapshot. Open or create an invoice in the editor to send it.'});if(record.status==='pending')return res.status(409).json({error:'This attempt has no confirmed result. Check the provider logs before sending again.'});const parsed=invoiceSchema.parse(record.invoice);res.json(await send({...parsed,id:record.invoiceId},{resendOf:record.id}));});
 app.get('/email-logs', (req,res)=>res.sendFile(resolve(root,'public/email-logs.html')));
+app.get('/invoices', (req,res)=>res.sendFile(resolve(root,'public/invoices.html')));
 app.get('/email-logs/:id', (req,res)=>res.sendFile(resolve(root,'public/email-detail.html')));
 app.use('/shared',express.static(resolve(root,'shared')));
 app.get('/invoice-template.js',(req,res)=>res.sendFile(resolve(root,'src/invoice-template.js')));

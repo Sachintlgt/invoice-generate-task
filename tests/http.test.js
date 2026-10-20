@@ -90,3 +90,33 @@ test('existing duplicate-number records can still be updated without creating an
  assert.equal((await readdir(join(dir,'invoices'))).length,2);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('saved invoice list supports create, add, edit, remove and reopen without another invoice',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'folio-saved-list-'));const app=createApp({DATA_DIR:dir});
+ try {
+  let response=await request(app,'/api/invoices');assert.equal(response.status,200);assert.deepEqual(response.json(),{items:[]});assert.equal(response.headers['cache-control'],'no-store');
+  assert.equal((await request(app,'/invoices')).status,200);
+  const body={...fixture(),number:'SAVED-FLOW',items:[{description:'Initial service',quantity:'2',unitPrice:'50'}],discount:'10',taxRate:'10'};
+  const created=(await request(app,'/api/invoices',{method:'POST',body})).json();
+  let listed=(await request(app,'/api/invoices')).json().items;assert.equal(listed.length,1);assert.equal(listed[0].id,created.id);assert.equal(listed[0].totalCents,9900);assert.equal(listed[0].itemCount,1);assert.ok(!('notes' in listed[0]));assert.ok(!('customFields' in listed[0]));assert.ok(!('business' in listed[0]));
+  const added={...body,items:[...body.items,{description:'Added service',quantity:'1.5',unitPrice:'19.99'}]};
+  response=await request(app,`/api/invoices/${created.id}`,{method:'PUT',body:added});assert.equal(response.status,200,response.text);assert.equal(response.json().id,created.id);assert.equal(response.json().totals.total,13199);
+  let reopened=(await request(app,`/api/invoices/${created.id}`)).json();assert.deepEqual(reopened.items,added.items);assert.deepEqual(reopened.customFields,body.customFields);
+  const edited={...added,notes:'Updated saved invoice',customer:{...body.customer,name:'Updated Client'},items:[{description:'Edited description',quantity:'3.25',unitPrice:'12.34'},added.items[1]]};
+  response=await request(app,`/api/invoices/${created.id}`,{method:'PUT',body:edited});assert.equal(response.status,200);assert.equal(response.json().totals.total,6611);
+  listed=(await request(app,'/api/invoices')).json().items;assert.equal(listed.length,1);assert.equal(listed[0].customerName,'Updated Client');assert.equal(listed[0].itemCount,2);assert.equal(listed[0].totalCents,6611);
+  const removed={...edited,items:[edited.items[1]]};response=await request(app,`/api/invoices/${created.id}`,{method:'PUT',body:removed});assert.equal(response.status,200);assert.equal(response.json().totals.total,2199);
+  const restarted=createApp({DATA_DIR:dir});reopened=(await request(restarted,`/api/invoices/${created.id}`)).json();assert.deepEqual(reopened.items,removed.items);assert.equal(reopened.notes,edited.notes);assert.equal(reopened.customer.name,'Updated Client');assert.equal((await request(restarted,'/api/invoices')).json().items.length,1);
+  assert.equal((await readdir(join(dir,'invoices'))).filter(name=>name.endsWith('.json')).length,1);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('failed saved-invoice update never creates a replacement and list ignores unrelated files',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'folio-saved-missing-'));const app=createApp({DATA_DIR:dir});
+ try{
+  const created=(await request(app,'/api/invoices',{method:'POST',body:fixture()})).json();
+  const {writeFile}=await import('node:fs/promises');await writeFile(join(dir,'invoices','unrelated.json'),'{}');
+  const missing='00000000-0000-4000-8000-000000000000';assert.equal((await request(app,`/api/invoices/${missing}`,{method:'PUT',body:fixture()})).status,404);
+  const listed=(await request(app,'/api/invoices')).json().items;assert.equal(listed.length,1);assert.equal(listed[0].id,created.id);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

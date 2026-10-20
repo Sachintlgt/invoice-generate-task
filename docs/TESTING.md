@@ -45,3 +45,7 @@ The server-generated email PDFs were rendered and checked separately from the or
 `tests/email-history.test.js` checks persisted statuses and artifacts across app recreation, inline PDF viewing, sandboxed message responses, immutable snapshot resend, server-controlled recipient, safe SMTP failures, legacy preview recovery without duplicates, pagination, routing, invalid paths, shared rate limits, pending attempts and accepted-mail/log-write failure handling. No live SMTP messages are sent by these tests. The already running server must restart before its new `/email-logs` routes can be reviewed in the browser. Browser review of the new history page was blocked until that restart; no visual pass is claimed yet.
 
 Duplicate-save regression: concurrent creates with the same invoice number produce one invoice and conflicts for the remaining requests. Updating the same ID works; renaming another invoice to an existing number is rejected. Whitespace-only required names/numbers are invalid.
+
+## Saved invoice regression checks
+
+53 tests pass. Added coverage for an empty/private metadata list, create and reopen, adding a fractional-quantity item, editing fields and prices, removing an item, updating the list totals/customer/item count, and reopening after server re-creation while retaining one invoice file. Also covers a failed update not creating a replacement, a failed frontend load blocking Save, and updates using the ID of the reopened invoice.
