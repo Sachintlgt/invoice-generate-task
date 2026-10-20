@@ -11,6 +11,7 @@ import { calculate } from './shared/calculations.js';
 import { mailer } from './src/email.js';
 import { invoicePDF, invoicePdfFilename } from './src/invoice-pdf.js';
 import { emailHistory } from './src/email-history.js';
+
 /** Build an app without opening a socket so tests can inject isolated storage and email settings. */
 export function createApp(settings = config) {
   const app = express(),
@@ -18,9 +19,11 @@ export function createApp(settings = config) {
     history = emailHistory(settings.DATA_DIR),
     send = mailer(settings, history),
     root = fileURLToPath(new URL('.', import.meta.url));
+
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(express.json({ limit: '128kb' }));
+
   // Keep invoice data out of caches and reject foreign-origin JSON writes.
   app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -33,13 +36,16 @@ export function createApp(settings = config) {
     }
     next();
   });
+
   app.get('/api/config', (req, res) =>
     res.json({
       emailMode: settings.SMTP_HOST ? 'smtp' : 'preview',
       ...(settings.TEST_EMAIL_TO ? { testRecipient: settings.TEST_EMAIL_TO } : {}),
     }),
   );
+
   app.get('/api/invoices', async (req, res) => res.json({ items: await store.list() }));
+
   app.get('/api/invoices/:id/pdf', async (req, res) => {
     const invoice = await store.get(req.params.id);
     res
@@ -47,7 +53,9 @@ export function createApp(settings = config) {
       .attachment(invoicePdfFilename(invoice.number))
       .send(await invoicePDF(invoice));
   });
+
   app.get('/api/invoices/:id', async (req, res) => res.json(await store.get(req.params.id)));
+
   // Recalculate authoritative totals; never trust IDs or totals supplied by the browser.
   async function save(req, res) {
     const parsed = invoiceSchema.safeParse(req.body);
@@ -69,8 +77,10 @@ export function createApp(settings = config) {
     await store.save(id, invoice);
     res.status(req.params.id ? 200 : 201).json(invoice);
   }
+
   app.post('/api/invoices', save);
   app.put('/api/invoices/:id', save);
+
   // Original sends and resends share one limit to prevent bypassing the send budget.
   const emailLimit = rateLimit({
     windowMs: 60000,
@@ -79,9 +89,11 @@ export function createApp(settings = config) {
     legacyHeaders: false,
     message: { error: 'Please wait a minute before sending another email.' },
   });
+
   app.post('/api/invoices/:id/email', emailLimit, async (req, res) =>
     res.json(await send(await store.get(req.params.id))),
   );
+
   app.get('/api/email-logs', async (req, res) => {
     const offset = Number(req.query.offset ?? 0),
       limit = Number(req.query.limit ?? 50);
@@ -97,10 +109,12 @@ export function createApp(settings = config) {
         .json({ error: 'Use a non-negative offset and a limit between 1 and 100.' });
     res.json(await history.list({ offset, limit }));
   });
+
   app.get('/api/email-logs/:id', async (req, res) => {
     const record = await history.get(req.params.id);
     res.json({ ...history.summary(record), text: record.text });
   });
+
   app.get('/api/email-logs/:id/pdf', async (req, res) => {
     const record = await history.get(req.params.id);
     res
@@ -108,6 +122,7 @@ export function createApp(settings = config) {
       .set('Content-Disposition', `inline; filename="${invoicePdfFilename(record.invoiceNumber)}"`)
       .send(await history.pdf(record.id));
   });
+
   app.get('/api/email-logs/:id/message', async (req, res) => {
     const record = await history.get(req.params.id);
     if (!record.html) return res.status(404).send('Email body is unavailable.');
@@ -119,6 +134,7 @@ export function createApp(settings = config) {
       .type('html')
       .send(record.html);
   });
+
   // Resend the immutable historical snapshot, not a subsequently edited invoice.
   app.post('/api/email-logs/:id/resend', emailLimit, async (req, res) => {
     const record = await history.get(req.params.id);
@@ -140,6 +156,7 @@ export function createApp(settings = config) {
       });
     res.json(await send({ ...parsed.data, id: record.invoiceId }, { resendOf: record.id }));
   });
+
   app.get('/email-logs', (req, res) => res.sendFile(resolve(root, 'public/email-logs.html')));
   app.get('/invoices', (req, res) => res.sendFile(resolve(root, 'public/invoices.html')));
   app.get('/email-logs/:id', (req, res) => res.sendFile(resolve(root, 'public/email-detail.html')));
@@ -147,6 +164,7 @@ export function createApp(settings = config) {
   app.get('/invoice-template.js', (req, res) =>
     res.sendFile(resolve(root, 'src/invoice-template.js')),
   );
+
   app.use(express.static(resolve(root, 'public')));
   app.use((req, res) => res.status(404).json({ error: 'Not found.' }));
   app.use((error, req, res, next) => {
@@ -161,6 +179,7 @@ export function createApp(settings = config) {
   });
   return app;
 }
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   createApp().listen(config.PORT, config.HOST, () =>
     console.log(`Folio invoice: http://${config.HOST}:${config.PORT}`),

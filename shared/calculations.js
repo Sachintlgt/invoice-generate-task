@@ -12,17 +12,21 @@ export function scaled(value, places = 2) {
   if (fraction.length > places) throw new Error(`Use at most ${places} decimal places.`);
   return BigInt(whole) * 10n ** BigInt(places) + BigInt(fraction.padEnd(places, '0'));
 }
+
 /** Divide non-negative integers and round halfway values up; the divisor must be positive. */
 const round = (n, d) => (n + d / 2n) / d;
+
 /** Reject totals that would lose integer precision when serialized as JSON numbers. */
 const safe = (n) => {
   if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Amount is too large.');
   return Number(n);
 };
+
 /** Treat an omitted or blank optional discount as zero; leave invalid inputs for validation. */
 export function normalizeDiscount(value) {
   return value === undefined || (typeof value === 'string' && value.trim() === '') ? '0' : value;
 }
+
 /** Reject fractional quantities instead of silently rounding an invoice's units. */
 export function quantityUnits(value) {
   const text = String(value);
@@ -33,6 +37,7 @@ export function quantityUnits(value) {
   }
   return BigInt(text);
 }
+
 /** Return integer cents: sum exact lines, subtract discount, then round percentage tax half-up. */
 export function calculate(invoice) {
   // Whole units multiplied by integer cents already produce exact line cents.
@@ -51,7 +56,9 @@ export function calculate(invoice) {
     total: safe(taxable + tax),
   };
 }
+
 const dollars = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
 /** Format cents without floating-point division, including amounts near the safe integer limit. */
 export function money(cents) {
   if (typeof cents !== 'bigint' && !Number.isSafeInteger(cents))
