@@ -4,7 +4,7 @@
 npm test
 ```
 
-Current result: **44 passed, 0 failed, 0 skipped**. See [detailed QA results](QA-RESULTS.md) for browser checks, decimal examples, 100-item/21-page print validation, fixes and remaining limits.
+Current result: **56 passed, 0 failed, 0 skipped**. See [detailed QA results](QA-RESULTS.md) for browser checks, decimal examples, 100-item multi-page PDF validation, fixes and remaining limits.
 
 ## Test layers
 
@@ -26,15 +26,15 @@ This test uses port 31987 and temporary storage. It skips only when the executio
 ## Repeat browser checks after UI changes
 
 1. Edit invoice details, add/remove items, and add/edit/show/hide/remove custom fields.
-2. Confirm the $99 example and decimal $26.86 case in `QA-RESULTS.md`.
+2. Confirm the $99 example and decimal-price $65.28 case (3 × $19.99 − $0.01, tax 8.875%) in `QA-RESULTS.md`.
 3. Save and reload; load another invoice and check the URL; cancel loading while edits are unsaved.
 4. Check native errors for required fields, email, dates and numeric ranges.
 5. Use keyboard Tab, Enter and Space; check focus after dynamic changes and saving.
 6. Review 320/360/768/1440px layouts and long unbroken descriptions.
 7. Print short and long invoices; disable browser-added headers/footers; confirm no controls or hidden custom fields.
-8. Configure Gmail privately and confirm actual delivery only to an address you control.
+8. Configure SMTP privately and confirm actual delivery only to an address you control.
 
-Actual Gmail delivery is still pending. Browser testing covers Chrome only and is not a claim of complete accessibility certification or cross-browser coverage.
+Live SMTP tests must use a recipient you control. Browser testing covers Chrome only and is not a claim of complete accessibility certification or cross-browser coverage.
 
 ## PDF email fix verification
 
@@ -42,10 +42,14 @@ The server-generated email PDFs were rendered and checked separately from the or
 
 ## Email history verification
 
-`tests/email-history.test.js` checks persisted statuses and artifacts across app recreation, inline PDF viewing, sandboxed message responses, immutable snapshot resend, server-controlled recipient, safe SMTP failures, legacy preview recovery without duplicates, pagination, routing, invalid paths, shared rate limits, pending attempts and accepted-mail/log-write failure handling. No live SMTP messages are sent by these tests. The already running server must restart before its new `/email-logs` routes can be reviewed in the browser. Browser review of the new history page was blocked until that restart; no visual pass is claimed yet.
+`tests/email-history.test.js` checks persisted statuses and artifacts across app recreation, inline PDF viewing, sandboxed message responses, immutable snapshot resend, server-controlled recipient, safe SMTP failures, legacy preview recovery without duplicates, pagination, routing, invalid paths, shared rate limits, pending attempts and accepted-mail/log-write failure handling. No live SMTP messages are sent by these tests. Restart the server after backend changes; historical email artifacts remain immutable.
 
 Duplicate-save regression: concurrent creates with the same invoice number produce one invoice and conflicts for the remaining requests. Updating the same ID works; renaming another invoice to an existing number is rejected. Whitespace-only required names/numbers are invalid.
 
 ## Saved invoice regression checks
 
-53 tests pass. Added coverage for an empty/private metadata list, create and reopen, adding a fractional-quantity item, editing fields and prices, removing an item, updating the list totals/customer/item count, and reopening after server re-creation while retaining one invoice file. Also covers a failed update not creating a replacement, a failed frontend load blocking Save, and updates using the ID of the reopened invoice.
+56 tests pass. Added coverage for an empty/private metadata list, create and reopen, adding a whole-quantity item, editing fields and prices, removing an item, updating the list totals/customer/item count, and reopening after server re-creation while retaining one invoice file. Also covers a failed update not creating a replacement, a failed frontend load blocking Save, and updates using the ID of the reopened invoice.
+
+## Integer quantity contract
+
+Quantity is a non-negative integer from 0 to 1,000,000. UI controls use step 1 and numeric input mode. Browser and API reject fractional quantities, decimal notation such as 1.0, exponent notation, negatives, empty values and values above the maximum. Shared calculations, new PDFs and email generation enforce this rule too. Tests verify rejected create/update requests do not modify saved records, and that historical fractional data remains readable for correction without changing old email snapshots.

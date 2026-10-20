@@ -42,3 +42,5 @@ As with the existing invoice API, authentication is intentionally outside the tr
 An accepted email is not reported as a failed send if the final log update fails: its pending record remains and the response tells the user to check provider logs before resending.
 
 Older HTML previews are linked to an existing invoice only when the entire rendered invoice matches exactly one saved invoice. Duplicate invoice numbers or ambiguous matches are never guessed. This restores the editor link without inventing a historical snapshot or delivery status.
+
+Original saved email artifacts are historical and are not rewritten for the integer-only quantity rule. A resend snapshot with fractional quantities is rejected; open the associated invoice, correct quantities to whole units, save and send from the editor.

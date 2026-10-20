@@ -72,3 +72,20 @@ test('older preview links to a uniquely matching saved invoice and editor data r
  const updated=(await request(restarted,'/api/email-logs')).json();
  assert.equal(updated.items.find(record=>record.id===other).invoiceId,null);
 }));
+
+test('historical fractional quantities stay readable but must be corrected before new PDF or email',async()=>temp(async dir=>{
+ const app=createApp({DATA_DIR:dir});const saved=(await request(app,'/api/invoices',{method:'POST',body:invoice()})).json();
+ const history=emailHistory(dir),record=await history.create({invoice:saved,from:'sender@example.com',recipient:'controlled@example.com',mode:'preview',subject:'Historical'});
+ const older={...saved,items:[{description:'Old fractional service',quantity:'1.5',unitPrice:'50'}]};
+ await writeFile(join(dir,'invoices',`${saved.id}.json`),JSON.stringify(older));
+ await writeFile(join(dir,'email-logs',`${record.id}.json`),JSON.stringify({...record,status:'preview',invoice:older}));
+ await mkdir(join(dir,'email-previews'),{recursive:true});
+ assert.equal((await request(app,'/api/email-logs')).status,200);
+ assert.equal((await request(app,`/api/invoices/${saved.id}`)).json().items[0].quantity,'1.5');
+ const pdf=await request(app,`/api/invoices/${saved.id}/pdf`);assert.equal(pdf.status,400);assert.match(pdf.json().error,/whole number/);
+ const sent=await request(app,`/api/invoices/${saved.id}/email`,{method:'POST',body:{}});assert.equal(sent.status,400);
+ const resent=await request(app,`/api/email-logs/${record.id}/resend`,{method:'POST',body:{}});assert.equal(resent.status,409);assert.match(resent.json().error,/whole numbers/);
+ const corrected=await request(app,`/api/invoices/${saved.id}`,{method:'PUT',body:{...invoice(),items:[{description:'Corrected service',quantity:'2',unitPrice:'50'}]}});assert.equal(corrected.status,200);
+ assert.equal((await history.get(record.id)).invoice.items[0].quantity,'1.5');
+ assert.equal((await request(app,`/api/invoices/${saved.id}/pdf`)).status,200);
+}));

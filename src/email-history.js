@@ -40,7 +40,8 @@ export function emailHistory(directory) {
       const candidates=[];
       for(const file of invoiceFiles.filter(file=>file.endsWith('.json')&&UUID.test(file.slice(0,-5)))) {
         const invoice=JSON.parse(await readFile(resolve(directory,'invoices',file),'utf8'));
-        candidates.push({id:file.slice(0,-5),html:invoiceHTML({...invoice,totals:calculate(invoice)})});
+        try { candidates.push({id:file.slice(0,-5),html:invoiceHTML({...invoice,totals:calculate(invoice)})}); }
+        catch(error) { if(error.status!==400)throw error; } // Old fractional quantities must be corrected in the editor.
       }
       await mkdir(root,{recursive:true});
       for(const file of (await readdir(root)).filter(file=>file.endsWith('.json')&&UUID.test(file.slice(0,-5)))) {

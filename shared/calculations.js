@@ -15,8 +15,16 @@ const safe = n => {
 export function normalizeDiscount(value) {
   return value === undefined || (typeof value === 'string' && value.trim() === '') ? '0' : value;
 }
+export function quantityUnits(value) {
+  const text=String(value);
+  if (!/^\d{1,9}$/.test(text) || BigInt(text)>1000000n) {
+    throw Object.assign(new Error('Quantity must be a whole number from 0 to 1,000,000.'), {status:400});
+  }
+  return BigInt(text);
+}
 export function calculate(invoice) {
-  const lines = invoice.items.map(item => round(scaled(item.quantity, 4) * scaled(item.unitPrice), 10000n));
+  // Whole units multiplied by integer cents already produce exact line cents.
+  const lines = invoice.items.map(item => quantityUnits(item.quantity) * scaled(item.unitPrice));
   const subtotal = lines.reduce((a, b) => a + b, 0n);
   const discount = scaled(normalizeDiscount(invoice.discount));
   if (discount > subtotal) throw new Error('Discount cannot exceed subtotal.');

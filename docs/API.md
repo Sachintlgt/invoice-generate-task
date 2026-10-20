@@ -51,3 +51,5 @@ Email-send responses include `logId` and `logUrl`. Resends share the original se
 - `GET /api/invoices` returns `{items:[{id,number,customerName,issueDate,dueDate,updatedAt,totalCents,itemCount}]}` sorted by most recent save. Totals are integer cents. Full addresses, notes and custom fields are omitted from the list; use `GET /api/invoices/:id` when opening a selected invoice.
 - `GET /invoices` serves the Saved invoices page. The editor includes the same section.
 - Creating uses `POST /api/invoices`; editing always uses `PUT /api/invoices/:id`. A missing update ID returns 404 and never creates another invoice.
+
+Quantity is a decimal-free numeric string such as `"0"`, `"1"` or `"1000000"`. Fractions, decimal notation (`"1.0"`), negatives, exponents and values over 1,000,000 return 400 on create/update. Unit price and discount retain two-decimal support, and tax rate retains four-decimal support. Existing fractional records can be retrieved for correction; new PDFs/emails require valid whole quantities.

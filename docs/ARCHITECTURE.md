@@ -25,10 +25,10 @@ Only `public/`, the calculation module and the explicitly exposed invoice templa
 
 ## Monetary contract
 
-API decimal values are strings. Unit prices and discount support two decimal places; quantity and percentage tax support four. Negative numbers, exponents and excess precision are rejected. Zero quantity is permitted by the exercise's non-negative requirement. Input sizes and ranges are bounded.
+API numeric values are strings. Quantity accepts only whole numbers from 0 to 1,000,000. Unit prices and discount support two decimal places; percentage tax supports four. Decimal quantity notation such as `1.0` or `1.5` is rejected, never truncated or rounded. Negative numbers, exponents and excess precision are rejected. Zero quantity is permitted by the exercise's non-negative requirement. Input sizes and ranges are bounded.
 
-1. Parse unit price to integer cents and quantity to units scaled by 10,000.
-2. Multiply and round each line half-up to cents.
+1. Parse unit price to integer cents and quantity to a whole-unit BigInt.
+2. Multiply whole units by integer cents. Every line is already an exact integer-cent amount; fractional-cent line rounding is unnecessary under this input contract.
 3. Sum rounded lines.
 4. Subtract fixed discount, rejecting discount greater than subtotal.
 5. Multiply the remainder by the scaled percentage, divide by 1,000,000 and round half-up.
@@ -38,10 +38,12 @@ BigInt handles intermediate arithmetic; totals must fit JavaScript's safe intege
 
 ## UI behavior
 
-Native form controls have visible labels. Add/remove actions are buttons and restore focus to a useful control. Errors use an alert region; asynchronous results use a status region. A skip link, focus outlines, responsive layouts and invoice-only print stylesheet are included. Custom field visibility affects preview, print, HTML email and plain-text email, but never arithmetic. The app warns before closing with unsaved changes.
+Native form controls have visible labels. Add/remove actions are buttons and restore focus to a useful control. Errors use an alert region; asynchronous results use a status region. A skip link, focus outlines, responsive layouts and invoice-only print stylesheet are included. Custom field visibility affects invoice preview, print and the attached PDF, but never arithmetic. The email body is a summary; the complete invoice is its PDF attachment. The app warns before closing with unsaved changes.
 
 ## Deliberate trade-offs
 
 One process, one small data directory and no frontend build pipeline minimize reviewer setup. Serialized atomic replacement avoids partial writes in one process, but does not provide distributed locking, edit conflict detection or database transactions. Existing invoice IDs use PUT; new invoices use POST. No authentication or payment scope is added.
 
 Email logging starts before PDF generation and SMTP. Final states are persisted after the attempt. Viewing reads original artifacts; resending uses the saved snapshot and adds a new log rather than overwriting history. List and detail pages are plain HTML/JavaScript at `/email-logs` and `/email-logs/:id`. See `EMAIL-LOGS.md`.
+
+Previously saved fractional quantities remain readable for correction. No automatic migration rounds or overwrites them. Save, new PDF generation and email require whole-number quantities; original email artifacts remain historical records.

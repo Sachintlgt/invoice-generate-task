@@ -61,7 +61,7 @@ Invoices are private JSON files in `data/invoices/`. The directory is created au
 - Node test runner: calculation tests and actual HTTP API checks.
 - PDFKit standalone distribution: server-side PDF attachments, kept under `vendor/pdfkit/` with its MIT license and verified provenance. No browser installation or extra npm setup is required.
 
-Verification: **53 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
+Verification: **56 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
 
 See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SECURITY.md), and [verification](docs/TESTING.md).
 
@@ -88,3 +88,9 @@ The editor remembers the last opened/saved invoice in this browser and resumes i
 The editor now includes a **Saved invoices** section. Open **http://localhost:3000/invoices** for the dedicated list. Search by invoice number, customer or ID and choose **Open and edit**. The editor clearly identifies the selected saved invoice and uses **Save changes** to update that same record, including added, edited or removed items. The list refreshes after saving. **New invoice** starts a separate draft.
 
 A failed invoice load blocks saving instead of silently creating a replacement. A repeated unchanged save clears the unsaved warning without another write. Older invoices with identical numbers remain separate records and are distinguished by their IDs. No existing invoice or email-history records were deleted. Restart the server after adding these API routes.
+
+## Quantity and decimal precision
+
+Quantity accepts **whole numbers only, from 0 to 1,000,000** (including zero). Values such as `1.5`, `1.0` and `1e2` are rejected rather than rounded. Unit price and fixed discount accept two decimal places; tax percentage accepts four. Monetary outputs always show two decimal places. Whole units multiplied by integer cents give exact line totals; discount is applied before tax, and tax rounds half-up to cents.
+
+Old saved invoices with fractional quantities are not silently changed. Open them, correct the quantities to whole units and save before generating a new PDF or sending. Previously saved email artifacts remain unchanged.
