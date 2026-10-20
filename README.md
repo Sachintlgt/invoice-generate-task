@@ -63,7 +63,7 @@ Invoices are private JSON files in `data/invoices/`. The directory is created au
 
 Verification: **53 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
 
-See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SECURITY.md), [verification](docs/TESTING.md), and [submission notes](docs/SUBMISSION.md).
+See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SECURITY.md), and [verification](docs/TESTING.md).
 
 ## Scope and limitations
 
@@ -77,7 +77,7 @@ Keep changes within the demo scope. Run `npm test`, review print/mobile behavior
 
 ## AI assistance and time
 
-OpenAI Codex assisted with architecture discussion, implementation, documentation and tests. The developer should review the modules and be able to explain their behavior. See `docs/SUBMISSION.md` for actual verification, remaining work and the time record. Do not claim unperformed manual checks or SMTP delivery.
+OpenAI Codex assisted with architecture discussion, implementation, documentation and tests. The developer should review the modules and be able to explain their behavior. See [QA results](docs/QA-RESULTS.md) for verification details. Do not claim unperformed manual checks or SMTP delivery.
 
 Invoice numbers must be unique (ignoring surrounding spaces and letter case). Duplicate create/rename requests return HTTP 409; edit the existing saved invoice instead. Repeated Save, or Send after an unchanged Save, reuses the saved invoice without another write. Existing duplicate files are not deleted automatically.
 

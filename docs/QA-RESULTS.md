@@ -27,7 +27,7 @@
 | SMTP wiring | PASS with stub — TLS required on port 587, server-controlled recipient, sanitized subject, HTML/plain text, and delivery failures propagated |
 | Real Gmail receipt | PENDING — configure App Password and confirm receipt at an address you control |
 | Security boundaries | PASS for tested cases — private files inaccessible, malformed IDs rejected, foreign-origin writes rejected, request size/content type enforced, headers present and email rate limit returns 429 |
-| Documentation/configuration | PASS — README, architecture, API, security, testing, submission notes and placeholder-only `.env.example` included |
+| Documentation/configuration | PASS — README, architecture, API, security, testing and placeholder-only `.env.example` included |
 
 ## Decimal examples
 
