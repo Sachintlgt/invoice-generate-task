@@ -1,5 +1,6 @@
 import { calculate, normalizeDiscount } from '/shared/calculations.js';
 import { invoiceHTML, escapeHTML as e } from '/invoice-template.js';
+
 const $ = (s) => document.querySelector(s),
   form = $('#invoice-form');
 const now = new Date();
@@ -8,6 +9,7 @@ const today = [
   String(now.getMonth() + 1).padStart(2, '0'),
   String(now.getDate()).padStart(2, '0'),
 ].join('-');
+
 let invoice = {
   business: {
     name: 'Studio North',
@@ -31,6 +33,7 @@ let invoice = {
     'Thank you for trusting us with your vision. Please include the invoice number with your payment.',
   customFields: [{ label: 'Payment method', value: 'Bank transfer', visible: true }],
 };
+
 let savedId = null,
   busy = false,
   emailMode = 'preview',

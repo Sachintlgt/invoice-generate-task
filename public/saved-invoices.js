@@ -7,8 +7,10 @@ const rows = root.querySelector('[data-invoice-rows]'),
   error = root.querySelector('[data-invoice-error]'),
   search = root.querySelector('[data-invoice-search]'),
   refresh = root.querySelector('[data-invoice-refresh]');
+
 let invoices = [],
   loading = false;
+
 /**
  * Filter saved metadata by invoice number, customer or UUID and render escaped rows.
  * Open links use the UUID because older records may share an invoice number.
@@ -32,6 +34,7 @@ function render() {
     : 'No saved invoices yet. Create an invoice and select Save invoice.';
   status.textContent = `${visible.length} of ${invoices.length} saved invoice${invoices.length === 1 ? '' : 's'}. Open and edit loads all saved fields and updates the same invoice.`;
 }
+
 /**
  * Fetch fresh saved-invoice metadata without caching. Prevent overlapping refreshes,
  * announce loading/errors, and leave the current invoice editor untouched on failure.

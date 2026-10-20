@@ -1,12 +1,15 @@
 import { escapeHTML as e } from '/invoice-template.js';
 import { money } from '/shared/calculations.js';
+
 const $ = (selector) => document.querySelector(selector),
   labels = { sent: 'Sent', failed: 'Failed', preview: 'Preview', pending: 'Pending / unknown' };
+
 let config = { emailMode: 'preview' },
   offset = 0,
   total = 0,
   busy = false;
 const limit = 25;
+
 const time = (value) =>
   value
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
