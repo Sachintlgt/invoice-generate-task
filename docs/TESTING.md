@@ -52,4 +52,4 @@ Duplicate-save regression: concurrent creates with the same invoice number produ
 
 ## Integer quantity contract
 
-Quantity is a non-negative integer from 0 to 1,000,000. UI controls use step 1 and numeric input mode. Browser and API reject fractional quantities, decimal notation such as 1.0, exponent notation, negatives, empty values and values above the maximum. Shared calculations, new PDFs and email generation enforce this rule too. Tests verify rejected create/update requests do not modify saved records, and that historical fractional data remains readable for correction without changing old email snapshots.
+Quantity is a positive integer from 1 to 1,000,000. UI controls use step 1 and numeric input mode. Browser and API reject fractional quantities, decimal notation such as 1.0, exponent notation, negatives, zero, empty values and values above the maximum. Shared calculations, new PDFs and email generation enforce this rule too. Tests verify rejected create/update requests do not modify saved records, and that historical fractional data remains readable for correction without changing old email snapshots.

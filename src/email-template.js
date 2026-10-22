@@ -5,7 +5,9 @@ import { calculate, money } from '../shared/calculations.js';
 // presentation table and attach the fully formatted invoice as a PDF.
 /**
  * Create an email-safe HTML summary, plain-text alternative and subject.
- * The complete itemized invoice is supplied separately as a PDF attachment; escape all user text.
+ * The complete itemized invoice, logo included, is supplied separately as a PDF attachment;
+ * the summary itself never embeds or attaches the logo, so there is one image, not two. All
+ * user text is escaped.
  */
 export function invoiceEmail(invoice) {
   const e = escapeHTML,

@@ -40,7 +40,10 @@ test('Express HTTP stack: create, read, update and preview email', async () => {
       body: { ...fixture(), number: 'QA-UPDATED' },
     });
     assert.equal(res.json().number, 'QA-UPDATED');
-    res = await request(app, `/api/invoices/${invoice.id}/email`, { method: 'POST', body: {} });
+    res = await request(app, `/api/invoices/${invoice.id}/email`, {
+      method: 'POST',
+      body: { recipientEmail: 'client@example.com' },
+    });
     assert.equal(res.status, 200, res.text);
     assert.equal(res.json().mode, 'preview');
     const html = await readFile(join(dir, 'email-previews', res.json().previewFile), 'utf8');
@@ -83,7 +86,7 @@ test('Express validation rejects bad values, malformed JSON and excessive payloa
     }
     let res = await request(app, '/api/invoices', { method: 'POST', rawBody: '{"broken":' });
     assert.equal(res.status, 400);
-    res = await request(app, '/api/invoices', { method: 'POST', rawBody: 'x'.repeat(140000) });
+    res = await request(app, '/api/invoices', { method: 'POST', rawBody: 'x'.repeat(620000) });
     assert.equal(res.status, 413);
     res = await request(app, '/api/invoices', {
       method: 'POST',
@@ -122,15 +125,25 @@ test('security: origins, private files, unknown IDs, headers and email rate limi
     const created = (
       await request(app, '/api/invoices', { method: 'POST', body: fixture() })
     ).json();
+    const emailBody = { recipientEmail: 'client@example.com' };
     for (let i = 0; i < 3; i++)
       assert.equal(
-        (await request(app, `/api/invoices/${created.id}/email`, { method: 'POST', body: {} }))
-          .status,
+        (
+          await request(app, `/api/invoices/${created.id}/email`, {
+            method: 'POST',
+            body: emailBody,
+          })
+        ).status,
         200,
       );
-    res = await request(app, `/api/invoices/${created.id}/email`, { method: 'POST', body: {} });
+    res = await request(app, `/api/invoices/${created.id}/email`, {
+      method: 'POST',
+      body: emailBody,
+    });
     assert.equal(res.status, 429);
     assert.ok(res.headers['retry-after']);
+    res = await request(app, `/api/invoices/${created.id}/email`, { method: 'POST', body: {} });
+    assert.equal(res.status, 429, 'rate limit still applies even to a now-invalid body');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -378,13 +391,154 @@ test('failed saved-invoice update never creates a replacement and list ignores u
   }
 });
 
+const TINY_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+test('business/customer emails are trimmed and validated with the same strict shape and length cap', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'folio-email-format-'));
+  const app = createApp({ DATA_DIR: dir });
+  try {
+    let res = await request(app, '/api/invoices', {
+      method: 'POST',
+      body: {
+        ...fixture(),
+        number: 'EMAIL-TRIM',
+        business: { ...fixture().business, email: '  owner@example.com  ' },
+      },
+    });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.json().business.email, 'owner@example.com');
+    for (const email of ['user@localhost', 'user@.com', `${'x'.repeat(250)}@example.com`]) {
+      res = await request(app, '/api/invoices', {
+        method: 'POST',
+        body: {
+          ...fixture(),
+          number: `EMAIL-BAD-${email.length}`,
+          customer: { ...fixture().customer, email },
+        },
+      });
+      assert.equal(res.status, 400, `expected 400 for ${email.slice(0, 30)}`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+test('business logo accepts valid PNG/JPEG data URLs and rejects bad ones', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'folio-logo-'));
+  const app = createApp({ DATA_DIR: dir });
+  try {
+    let res = await request(app, '/api/invoices', {
+      method: 'POST',
+      body: {
+        ...fixture(),
+        number: 'LOGO-OK',
+        business: { ...fixture().business, logo: TINY_PNG },
+      },
+    });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.json().business.logo, TINY_PNG);
+    res = await request(app, `/api/invoices/${res.json().id}`);
+    assert.equal(res.json().business.logo, TINY_PNG);
+    // Omitting the field entirely defaults to '', so pre-existing saved invoices keep validating.
+    res = await request(app, '/api/invoices', {
+      method: 'POST',
+      body: { ...fixture(), number: 'LOGO-OMITTED' },
+    });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.json().business.logo, '');
+    for (const logo of [
+      'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+      'data:image/png;base64,not-valid-base64!!',
+      'javascript:alert(1)',
+      `data:image/png;base64,${'A'.repeat(500000)}`,
+    ]) {
+      res = await request(app, '/api/invoices', {
+        method: 'POST',
+        body: {
+          ...fixture(),
+          number: `LOGO-BAD-${logo.length}`,
+          business: { ...fixture().business, logo },
+        },
+      });
+      assert.equal(res.status, 400, `expected 400 for logo: ${logo.slice(0, 40)}`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+test('sending an email requires a valid recipientEmail, independent of TEST_EMAIL_TO', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'folio-recipient-'));
+  const app = createApp({ DATA_DIR: dir });
+  try {
+    const created = (
+      await request(app, '/api/invoices', { method: 'POST', body: fixture() })
+    ).json();
+    // Stay within the 3-per-minute email rate limit: 2 invalid attempts + 1 valid below.
+    for (const body of [{}, { recipientEmail: 'not-an-email' }]) {
+      const res = await request(app, `/api/invoices/${created.id}/email`, {
+        method: 'POST',
+        body,
+      });
+      assert.equal(res.status, 400, JSON.stringify(body));
+    }
+    const res = await request(app, `/api/invoices/${created.id}/email`, {
+      method: 'POST',
+      body: { recipientEmail: 'customer@example.com' },
+    });
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.json().mode, 'preview');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+test('recipientEmail validation rejects malformed/oversized addresses and trims whitespace', async () => {
+  // Each case gets its own app/dir: the email rate limit (3/minute/IP) is shared across
+  // requests to the same running app, and this test needs more than 3 independent checks.
+  for (const recipientEmail of [
+    'user@localhost', // no real TLD
+    'user@.com', // empty domain label
+    'user@example..com', // consecutive dots
+    'user name@example.com', // embedded space
+    'user@example.com\r\nBcc: attacker@example.com', // header-injection attempt
+    `${'x'.repeat(250)}@example.com`, // exceeds the 254-char RFC cap
+  ]) {
+    const dir = await mkdtemp(join(tmpdir(), 'folio-recipient-format-'));
+    const app = createApp({ DATA_DIR: dir });
+    try {
+      const created = (
+        await request(app, '/api/invoices', { method: 'POST', body: fixture() })
+      ).json();
+      const res = await request(app, `/api/invoices/${created.id}/email`, {
+        method: 'POST',
+        body: { recipientEmail },
+      });
+      assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(recipientEmail)}`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  // Surrounding whitespace is trimmed rather than rejected.
+  const dir = await mkdtemp(join(tmpdir(), 'folio-recipient-format-ok-'));
+  const app = createApp({ DATA_DIR: dir });
+  try {
+    const created = (
+      await request(app, '/api/invoices', { method: 'POST', body: fixture() })
+    ).json();
+    const res = await request(app, `/api/invoices/${created.id}/email`, {
+      method: 'POST',
+      body: { recipientEmail: '  customer@example.com  ' },
+    });
+    assert.equal(res.status, 200, res.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 test('create and update reject fractional quantities without modifying the saved invoice', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'folio-whole-quantity-'));
   const app = createApp({ DATA_DIR: dir });
   try {
     const body = fixture();
     const created = (await request(app, '/api/invoices', { method: 'POST', body })).json();
-    for (const quantity of ['0.5', '1.5', '1.0', '1e2', '-1', '1000001', '']) {
+    for (const quantity of ['0', '0.5', '1.5', '1.0', '1e2', '-1', '1000001', '']) {
       const invalid = {
         ...body,
         number: `INVALID-${quantity}`,

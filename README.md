@@ -36,9 +36,15 @@ EMAIL_FROM=yourname@gmail.com
 TEST_EMAIL_TO=your-own-address@gmail.com
 ```
 
-Restart the server. `false` means STARTTLS on port 587, not unencrypted delivery; the SMTP transport requires TLS. Use a Google App Password rather than your normal account password. Never commit `.env` or share real credentials with a reviewer. Only use a recipient you control. The browser cannot choose recipients: the server uses `TEST_EMAIL_TO`.
+Restart the server. `false` means STARTTLS on port 587, not unencrypted delivery; the SMTP transport requires TLS. Use a Google App Password rather than your normal account password. Never commit `.env` or share real credentials with a reviewer. `TEST_EMAIL_TO` is now optional — the editor's **Send invoice to** field supplies the recipient per send (defaulted to the invoice's bill-to email, editable), validated server-side as a well-formed address. There is no authentication in this demo, so this is a deliberate trade-off: the existing 3-sends-per-minute-per-IP rate limit is the abuse control, not a fixed recipient. Only send to addresses you control while testing.
+
+Clicking Send always opens a confirmation dialog first, showing the invoice number, total and recipient, before anything is saved or sent.
 
 Without `SMTP_HOST`, **Preview email** saves HTML plus the invoice PDF under `data/email-previews/`; it does not deliver mail. Open the generated file locally. This fallback alone does not demonstrate successful SMTP delivery. Real delivery remains unverified until credentials are configured and a test is received.
+
+## Business logo
+
+Upload a PNG or JPEG logo (up to 300 KB) in the "Your business" section of the editor. It appears in the live preview, the Print/PDF layout and the PDF email attachment — never embedded or attached separately in the email body itself, so a send never carries more than the one invoice PDF. SVG and other formats are rejected (SVG can carry scripts); a corrupted or unreadable logo is skipped rather than failing PDF generation. Remove it with the **Remove logo** button. Logos are stored as part of the invoice's JSON record.
 
 ## Saved email history
 
@@ -61,7 +67,7 @@ Invoices are private JSON files in `data/invoices/`. The directory is created au
 - Node test runner: calculation tests and actual HTTP API checks.
 - PDFKit standalone distribution: server-side PDF attachments, kept under `vendor/pdfkit/` with its MIT license and verified provenance. No browser installation or extra npm setup is required.
 
-Verification: **56 automated tests passed**; Chrome browser checks and one-page/21-page PDF exports passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
+Verification: **63 automated tests passed**; browser checks covering the editor, logo upload, send confirmation and email logs, plus one-page/21-page PDF exports, passed. Real Gmail delivery remains pending. See [QA results](docs/QA-RESULTS.md).
 
 See [architecture](docs/ARCHITECTURE.md), [API](docs/API.md), [security](docs/SECURITY.md), and [verification](docs/TESTING.md).
 
@@ -91,7 +97,7 @@ A failed invoice load blocks saving instead of silently creating a replacement. 
 
 ## Quantity and decimal precision
 
-Quantity accepts **whole numbers only, from 0 to 1,000,000** (including zero). Values such as `1.5`, `1.0` and `1e2` are rejected rather than rounded. Unit price and fixed discount accept two decimal places; tax percentage accepts four. Monetary outputs always show two decimal places. Whole units multiplied by integer cents give exact line totals; discount is applied before tax, and tax rounds half-up to cents.
+Quantity accepts **whole numbers only, from 1 to 1,000,000**. A zero or blank quantity is rejected rather than silently dropping the line item. Values such as `1.5`, `1.0` and `1e2` are rejected rather than rounded. Unit price and fixed discount accept two decimal places; tax percentage accepts four. Monetary outputs always show two decimal places. Whole units multiplied by integer cents give exact line totals; discount is applied before tax, and tax rounds half-up to cents.
 
 Old saved invoices with fractional quantities are not silently changed. Open them, correct the quantities to whole units and save before generating a new PDF or sending. Previously saved email artifacts remain unchanged.
 

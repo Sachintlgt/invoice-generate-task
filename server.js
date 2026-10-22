@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import config from './src/config.js';
 import { storage } from './src/storage.js';
-import { invoiceSchema } from './src/validation.js';
+import { invoiceSchema, emailRequestSchema } from './src/validation.js';
 import { calculate } from './shared/calculations.js';
 import { mailer } from './src/email.js';
 import { invoicePDF, invoicePdfFilename } from './src/invoice-pdf.js';
@@ -22,7 +22,8 @@ export function createApp(settings = config) {
 
   app.disable('x-powered-by');
   app.use(helmet());
-  app.use(express.json({ limit: '128kb' }));
+  // 600kb accommodates an optional base64 business logo (bounded further by invoiceSchema).
+  app.use(express.json({ limit: '600kb' }));
 
   // Keep invoice data out of caches and reject foreign-origin JSON writes.
   app.use('/api', (req, res, next) => {
@@ -90,9 +91,17 @@ export function createApp(settings = config) {
     message: { error: 'Please wait a minute before sending another email.' },
   });
 
-  app.post('/api/invoices/:id/email', emailLimit, async (req, res) =>
-    res.json(await send(await store.get(req.params.id))),
-  );
+  // The browser supplies the recipient per send; validate it the same way as any other input.
+  app.post('/api/invoices/:id/email', emailLimit, async (req, res) => {
+    const parsed = emailRequestSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({
+        error: 'Enter a valid recipient email address.',
+        issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    const invoice = await store.get(req.params.id);
+    res.json(await send(invoice, { recipientEmail: parsed.data.recipientEmail }));
+  });
 
   app.get('/api/email-logs', async (req, res) => {
     const offset = Number(req.query.offset ?? 0),
@@ -154,7 +163,12 @@ export function createApp(settings = config) {
         error:
           'This saved email contains values that no longer meet invoice validation. Open its invoice, correct quantities to whole numbers, then send from the editor.',
       });
-    res.json(await send({ ...parsed.data, id: record.invoiceId }, { resendOf: record.id }));
+    res.json(
+      await send(
+        { ...parsed.data, id: record.invoiceId },
+        { resendOf: record.id, recipientEmail: record.recipient },
+      ),
+    );
   });
 
   app.get('/email-logs', (req, res) => res.sendFile(resolve(root, 'public/email-logs.html')));

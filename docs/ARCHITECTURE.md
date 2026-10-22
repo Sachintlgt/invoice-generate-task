@@ -25,7 +25,7 @@ Only `public/`, the calculation module and the explicitly exposed invoice templa
 
 ## Monetary contract
 
-API numeric values are strings. Quantity accepts only whole numbers from 0 to 1,000,000. Unit prices and discount support two decimal places; percentage tax supports four. Decimal quantity notation such as `1.0` or `1.5` is rejected, never truncated or rounded. Negative numbers, exponents and excess precision are rejected. Zero quantity is permitted by the exercise's non-negative requirement. Input sizes and ranges are bounded.
+API numeric values are strings. Quantity accepts only whole numbers from 1 to 1,000,000. Unit prices and discount support two decimal places; percentage tax supports four. Decimal quantity notation such as `1.0` or `1.5` is rejected, never truncated or rounded. Negative numbers, zero, exponents and excess precision are rejected — a line item always represents at least one unit rather than silently appearing with a zero amount. Input sizes and ranges are bounded.
 
 1. Parse unit price to integer cents and quantity to a whole-unit BigInt.
 2. Multiply whole units by integer cents. Every line is already an exact integer-cent amount; fractional-cent line rounding is unnecessary under this input contract.
@@ -38,7 +38,9 @@ BigInt handles intermediate arithmetic; totals must fit JavaScript's safe intege
 
 ## UI behavior
 
-Native form controls have visible labels. Add/remove actions are buttons and restore focus to a useful control. Errors use an alert region; asynchronous results use a status region. A skip link, focus outlines, responsive layouts and invoice-only print stylesheet are included. Custom field visibility affects invoice preview, print and the attached PDF, but never arithmetic. The email body is a summary; the complete invoice is its PDF attachment. The app warns before closing with unsaved changes.
+Native form controls have visible labels. Add/remove actions are buttons and restore focus to a useful control. Errors use an alert region; asynchronous results use a status region. Every error/warning also raises a dismissible, auto-expiring toast fixed to the top-right corner (`public/toast.js`, shared across the editor, saved invoices and email logs pages) so it's visible even when the inline region is scrolled out of view; a repeated identical message does not spam a second toast. A skip link, focus outlines, responsive layouts and invoice-only print stylesheet are included. Custom field visibility affects invoice preview, print and the attached PDF, but never arithmetic. The email body is a summary; the complete invoice is its PDF attachment. The app warns before closing with unsaved changes.
+
+An optional business logo (PNG/JPEG, ≤300 KB) can be uploaded in the editor; it renders in the live preview, the print layout and the PDF header, each capped to a 160×80px box that preserves aspect ratio. It is never embedded in or attached to the email body — only the PDF carries it, so a send contains exactly one image, not two. The recipient email is a browser-supplied field (defaulted to the bill-to email, user-editable) rather than a fixed server address; sending always goes through a native `<dialog>` confirmation step that summarizes the invoice, total and recipient before anything is sent.
 
 ## Deliberate trade-offs
 

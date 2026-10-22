@@ -68,6 +68,67 @@ test('SMTP adapter propagates delivery failures instead of claiming success', as
   );
 });
 
+test('a browser-supplied recipientEmail overrides TEST_EMAIL_TO', async (t) => {
+  let message;
+  t.mock.method(nodemailer, 'createTransport', () => ({
+    sendMail: async (payload) => {
+      message = payload;
+      return { accepted: ['typed@example.com'] };
+    },
+  }));
+  const send = mailer({
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_SECURE: 'true',
+    EMAIL_FROM: 'sender@example.com',
+    TEST_EMAIL_TO: 'controlled@example.com',
+  });
+  const result = await send(invoice(), { recipientEmail: 'typed@example.com' });
+  assert.equal(result.mode, 'smtp');
+  assert.equal(message.to, 'typed@example.com');
+});
+const TINY_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+test('SMTP mode never embeds or attaches the logo separately from the PDF', async (t) => {
+  let message;
+  t.mock.method(nodemailer, 'createTransport', () => ({
+    sendMail: async (payload) => {
+      message = payload;
+      return { accepted: ['typed@example.com'] };
+    },
+  }));
+  const send = mailer({
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_SECURE: 'true',
+    EMAIL_FROM: 'sender@example.com',
+  });
+  const withLogo = invoice();
+  withLogo.business.logo = TINY_PNG;
+  await send(withLogo, { recipientEmail: 'typed@example.com' });
+  assert.ok(!message.html.includes(TINY_PNG));
+  assert.ok(!message.html.includes('cid:'));
+  assert.equal(message.attachments.length, 1);
+  assert.equal(message.attachments[0].contentType, 'application/pdf');
+});
+test('preview mode (no SMTP) never embeds the logo in the saved email HTML either', async () => {
+  const { mkdtemp, rm, readFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = await mkdtemp(join(tmpdir(), 'folio-preview-logo-'));
+  try {
+    const send = mailer({ DATA_DIR: dir });
+    const withLogo = invoice();
+    withLogo.business.logo = TINY_PNG;
+    const result = await send(withLogo);
+    assert.equal(result.mode, 'preview');
+    const html = await readFile(join(dir, 'email-previews', result.previewFile), 'utf8');
+    assert.ok(!html.includes(TINY_PNG));
+    const pdf = await readFile(join(dir, 'email-previews', result.previewPdfFile));
+    // The logo still appears, embedded inside the attached/saved PDF document itself.
+    assert.match(pdf.toString('latin1'), /\/Subtype\s*\/Image/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 test('SMTP rejected recipient is a failure even if transport resolves', async (t) => {
   t.mock.method(nodemailer, 'createTransport', () => ({
     sendMail: async () => ({ accepted: [], rejected: ['controlled@example.com'] }),

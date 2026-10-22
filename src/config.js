@@ -17,9 +17,8 @@ const env = z
   })
   .parse(process.env);
 // Fail at startup rather than accepting email requests with incomplete SMTP credentials.
-if (
-  env.SMTP_HOST &&
-  ![env.SMTP_USER, env.SMTP_PASS, env.EMAIL_FROM, env.TEST_EMAIL_TO].every(Boolean)
-)
-  throw new Error('SMTP requires SMTP_USER, SMTP_PASS, EMAIL_FROM and TEST_EMAIL_TO.');
+// TEST_EMAIL_TO is optional: the browser now supplies the recipient per send; it is
+// kept only as an optional fallback and a default to show in the UI.
+if (env.SMTP_HOST && ![env.SMTP_USER, env.SMTP_PASS, env.EMAIL_FROM].every(Boolean))
+  throw new Error('SMTP requires SMTP_USER, SMTP_PASS and EMAIL_FROM.');
 export default env;

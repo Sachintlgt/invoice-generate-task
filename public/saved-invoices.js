@@ -1,5 +1,6 @@
 import { escapeHTML as e } from '/invoice-template.js';
 import { money } from '/shared/calculations.js';
+import { showToast } from '/toast.js';
 
 const root = document.querySelector('#saved-invoices');
 const rows = root.querySelector('[data-invoice-rows]'),
@@ -57,6 +58,7 @@ async function load() {
   } catch (err) {
     error.textContent = err.message;
     error.hidden = false;
+    showToast(err.message, { kind: 'error' });
     status.textContent =
       'Saved invoice list unavailable. Your current editor data has not been changed.';
   } finally {

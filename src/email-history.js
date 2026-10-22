@@ -304,7 +304,6 @@ export function safeEmailError(error) {
   if (error.code === 'EDNS') return 'Could not resolve the SMTP server hostname.';
   if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKET' || error.code === 'ECONNRESET')
     return 'SMTP connection failed. Delivery is not confirmed; check provider logs before resending.';
-  if (error.code === 'ERECIPIENT')
-    return 'The SMTP provider rejected the configured test recipient.';
+  if (error.code === 'ERECIPIENT') return 'The SMTP provider rejected the recipient address.';
   return 'Email could not be completed. Check the server configuration and provider logs.';
 }

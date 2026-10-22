@@ -27,15 +27,16 @@ export function normalizeDiscount(value) {
   return value === undefined || (typeof value === 'string' && value.trim() === '') ? '0' : value;
 }
 
-/** Reject fractional quantities instead of silently rounding an invoice's units. */
+/** Reject fractional or zero quantities instead of silently rounding or dropping a line item. */
 export function quantityUnits(value) {
   const text = String(value);
-  if (!/^\d{1,9}$/.test(text) || BigInt(text) > 1000000n) {
-    throw Object.assign(new Error('Quantity must be a whole number from 0 to 1,000,000.'), {
+  const units = /^\d{1,9}$/.test(text) ? BigInt(text) : null;
+  if (units === null || units < 1n || units > 1000000n) {
+    throw Object.assign(new Error('Quantity must be a whole number from 1 to 1,000,000.'), {
       status: 400,
     });
   }
-  return BigInt(text);
+  return units;
 }
 
 /** Return integer cents: sum exact lines, subtract discount, then round percentage tax half-up. */

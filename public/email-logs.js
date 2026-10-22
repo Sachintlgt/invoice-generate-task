@@ -1,5 +1,6 @@
 import { escapeHTML as e } from '/invoice-template.js';
 import { money } from '/shared/calculations.js';
+import { showToast } from '/toast.js';
 
 const $ = (selector) => document.querySelector(selector),
   labels = { sent: 'Sent', failed: 'Failed', preview: 'Preview', pending: 'Pending / unknown' };
@@ -22,7 +23,10 @@ const time = (value) =>
 function showError(message) {
   $('#mail-error').hidden = !message;
   $('#mail-error').textContent = message;
-  if (message) $('#mail-error').focus();
+  if (message) {
+    $('#mail-error').focus();
+    showToast(message, { kind: 'error' });
+  }
 }
 /**
  * Fetch saved-email metadata or submit an empty JSON action body.
@@ -39,13 +43,17 @@ async function api(path, method = 'GET') {
   return data;
 }
 /**
- * Link to the associated saved invoice for preview, editing and sending.
- * Do not invent a link when an older email has no recoverable invoice ID.
+ * Link to the associated saved invoice for preview, editing and sending, plus a direct
+ * link to the exact PDF that was attached to this historical send, when one was saved.
  */
 function actions(record) {
-  return record.invoiceId
+  const edit = record.invoiceId
     ? `<a href="/?invoice=${e(record.invoiceId)}#editor" aria-label="Open invoice ${e(record.invoiceNumber)} to preview, edit and send">Preview, Edit, Send</a>`
     : '<span class="mail-secondary" title="This older email preview has no saved invoice to open.">Invoice unavailable</span>';
+  const pdf = record.hasPdf
+    ? `<a href="/api/email-logs/${e(record.id)}/pdf" target="_blank" rel="noopener" aria-label="View the invoice PDF sent with ${e(record.invoiceNumber)}">View sent invoice (PDF)</a>`
+    : '';
+  return edit + pdf;
 }
 /**
  * Render the recorded attempt status as escaped text; Sent means provider acceptance.
@@ -166,7 +174,7 @@ run(async () => {
   config = await api('/api/config');
   $('#send-note').textContent =
     config.emailMode === 'smtp'
-      ? `Open an invoice to preview, edit and send it to the configured test address: ${config.testRecipient}.`
+      ? 'Open an invoice to preview, edit and send it to whichever address you enter in the editor.'
       : 'Preview mode: open an invoice to preview and edit it. Sending creates a local email preview.';
   await refresh();
 });

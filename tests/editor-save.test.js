@@ -24,6 +24,7 @@ test('editor saves actual changed data even without an input event and skips unc
     populate() {},
     read() {},
     syncURL() {},
+    status() {},
     $: (key) => {
       if (!elements.has(key)) elements.set(key, {});
       return elements.get(key);
@@ -86,6 +87,7 @@ test('failed invoice load blocks save instead of creating a new invoice', async 
     read() {},
     populate() {},
     syncURL() {},
+    status() {},
     window: { dispatchEvent() {} },
     Event,
     $: (key) => {
@@ -132,6 +134,7 @@ test('reopening an invoice binds edits to its original ID and unchanged save cle
     read() {},
     populate() {},
     syncURL() {},
+    status() {},
     $: (key) => {
       if (!elements.has(key)) elements.set(key, {});
       return elements.get(key);

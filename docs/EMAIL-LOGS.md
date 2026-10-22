@@ -8,7 +8,7 @@ Every new email attempt stores its invoice snapshot, sender and recipient, subje
 
 | Status            | Meaning                                                                                         |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
-| Sent              | The SMTP provider accepted the configured test recipient; inbox delivery is not confirmed       |
+| Sent              | The SMTP provider accepted the recipient address; inbox delivery is not confirmed               |
 | Failed            | The attempt did not complete; a safe diagnostic is saved                                        |
 | Preview           | Local preview only; nothing was sent                                                            |
 | Pending / unknown | The attempt started but no final status is recorded; check provider history before another send |
@@ -19,13 +19,14 @@ Dates are stored as ISO UTC timestamps and displayed in the browser's local time
 
 - **Preview, Edit, Send** is one link to `/?invoice=<saved-invoice-id>#editor`. It opens the saved invoice with all fields, live preview, Save and Send controls. Clicking the link does not send an email.
 - Save updates that invoice; previously logged email snapshots and PDFs stay unchanged. The editor shows the latest saved invoice, which may differ from the earlier email.
-- Use the editor's Send button to save and email the edited invoice to the current server-configured test recipient. In preview mode it creates a local preview.
-- Click the invoice number to view email metadata and its isolated body preview in a new tab.
+- The editor's Send button asks for confirmation (showing the recipient, invoice number and total), then saves and emails the invoice to whichever address is in the **Send invoice to** field (defaulted to the bill-to email, editable). In preview mode it creates a local preview instead of delivering mail.
+- Every record lists the recipient that attempt actually used, since it can differ send to send.
+- Click the invoice number to view email metadata, its isolated body preview and a link to the exact PDF that was attached (the business logo, when set, appears only in that PDF, not in the body preview).
 - Older records without a saved invoice show **Invoice unavailable**.
 - Original sends and resends share the same three-attempt-per-minute client IP rate limit.
 - Pending/unknown attempts cannot be resent directly, to reduce duplicate sends when the provider's result is unknown.
 
-The current configured test recipient is displayed above the list and detail page. A status link after sending from the editor opens the saved attempt.
+A status link after sending from the editor opens the saved attempt.
 
 ## Older emails
 
@@ -37,7 +38,7 @@ Earlier SMTP emails were not logged by the old application, so their delivery st
 
 Runtime history is excluded from Git and static file serving. List/detail APIs return metadata, not full invoice snapshots or SMTP credentials. The email-body endpoint and iframe are sandboxed with a restrictive CSP: no scripts, forms, remote images or tracking requests. User text is escaped in list/detail views. Only UUID log paths are accepted.
 
-As with the existing invoice API, authentication is intentionally outside the trial scope. Anyone with access to this demo can read its history and trigger sends to the configured test address. Use fictional data. Multi-process JSON storage and provider delivery webhooks are not implemented.
+As with the existing invoice API, authentication is intentionally outside the trial scope. Anyone with access to this demo can read its history and trigger sends to any address they enter, within the per-IP rate limit. Use fictional data. Multi-process JSON storage and provider delivery webhooks are not implemented.
 
 An accepted email is not reported as a failed send if the final log update fails: its pending record remains and the response tells the user to check provider logs before resending.
 

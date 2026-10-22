@@ -20,13 +20,18 @@ export function mailer(config, history) {
       })
     : null;
   // Persist the pending attempt before generating artifacts so interrupted sends remain traceable.
-  return async (invoice, { resendOf = null } = {}) => {
+  return async (invoice, { resendOf = null, recipientEmail } = {}) => {
+    // The browser supplies the recipient per send; TEST_EMAIL_TO is only a fallback
+    // for legacy/resend callers that omit one.
+    const recipient = recipientEmail || config.TEST_EMAIL_TO;
+    // The business logo appears only inside the generated PDF (see invoice-pdf.js), not in
+    // the email body or as a separate attachment — one artifact, not a duplicated image.
     const message = invoiceEmail(invoice);
     const record = history
       ? await history.create({
           invoice,
           from: config.EMAIL_FROM,
-          recipient: config.TEST_EMAIL_TO,
+          recipient,
           mode: transport ? 'smtp' : 'preview',
           subject: message.subject,
           resendOf,
@@ -56,8 +61,8 @@ export function mailer(config, history) {
       }
       const result = await transport.sendMail({
         from: config.EMAIL_FROM,
-        // The browser cannot override the controlled test recipient.
-        to: config.TEST_EMAIL_TO,
+        // The recipient comes from the browser's input, validated server-side as an email.
+        to: recipient,
         ...message,
         attachments: [
           {
@@ -69,7 +74,7 @@ export function mailer(config, history) {
         ],
       });
       if (result?.rejected?.length || (Array.isArray(result?.accepted) && !result.accepted.length))
-        throw Object.assign(new Error('The SMTP provider did not accept the test recipient.'), {
+        throw Object.assign(new Error('The SMTP provider did not accept the recipient.'), {
           code: 'ERECIPIENT',
         });
       accepted = true;

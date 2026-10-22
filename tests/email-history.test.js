@@ -35,7 +35,10 @@ test('email history stores preview snapshot, body and inline PDF across app rest
     let app = createApp({ DATA_DIR: dir });
     const saved = (await request(app, '/api/invoices', { method: 'POST', body: invoice() })).json();
     const sent = (
-      await request(app, `/api/invoices/${saved.id}/email`, { method: 'POST', body: {} })
+      await request(app, `/api/invoices/${saved.id}/email`, {
+        method: 'POST',
+        body: { recipientEmail: 'customer@example.com' },
+      })
     ).json();
     assert.ok(sent.logId);
     assert.equal(sent.logUrl, `/email-logs/${sent.logId}`);
@@ -82,7 +85,10 @@ test('resend uses immutable saved invoice and current controlled recipient, crea
     const app = createApp(settings);
     const saved = (await request(app, '/api/invoices', { method: 'POST', body: invoice() })).json();
     const first = (
-      await request(app, `/api/invoices/${saved.id}/email`, { method: 'POST', body: {} })
+      await request(app, `/api/invoices/${saved.id}/email`, {
+        method: 'POST',
+        body: { recipientEmail: 'controlled@example.com' },
+      })
     ).json();
     await request(app, `/api/invoices/${saved.id}`, {
       method: 'PUT',
@@ -124,7 +130,7 @@ test('failed SMTP attempts are saved with safe errors and no false Sent status',
     const saved = (await request(app, '/api/invoices', { method: 'POST', body: invoice() })).json();
     const response = await request(app, `/api/invoices/${saved.id}/email`, {
       method: 'POST',
-      body: {},
+      body: { recipientEmail: 'customer@example.com' },
     });
     assert.equal(response.status, 500);
     assert.ok(!response.text.includes('secret-smtp-password'));
@@ -207,7 +213,10 @@ test('pending attempts cannot be resent and original/resend endpoints share one 
     );
     const saved = (await request(app, '/api/invoices', { method: 'POST', body: invoice() })).json();
     const first = (
-      await request(app, `/api/invoices/${saved.id}/email`, { method: 'POST', body: {} })
+      await request(app, `/api/invoices/${saved.id}/email`, {
+        method: 'POST',
+        body: { recipientEmail: 'customer@example.com' },
+      })
     ).json();
     assert.equal(
       (await request(app, `/api/email-logs/${first.logId}/resend`, { method: 'POST', body: {} }))
@@ -304,9 +313,10 @@ test('historical fractional quantities stay readable but must be corrected befor
     assert.match(pdf.json().error, /whole number/);
     const sent = await request(app, `/api/invoices/${saved.id}/email`, {
       method: 'POST',
-      body: {},
+      body: { recipientEmail: 'customer@example.com' },
     });
     assert.equal(sent.status, 400);
+    assert.match(sent.json().error, /whole number/);
     const resent = await request(app, `/api/email-logs/${record.id}/resend`, {
       method: 'POST',
       body: {},

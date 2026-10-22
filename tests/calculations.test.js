@@ -30,15 +30,19 @@ test('negative, excessive discount, unsupported precision and unsafe totals reje
   assert.throws(() => calculate(invoice([item('1', '1')], '2')));
   assert.throws(() => calculate(invoice([item('1000000', '999999999999')])));
 });
-test('zero quantity allowed and custom fields do not affect totals', () => {
+test('zero quantity is rejected and custom fields do not affect totals', () => {
+  assert.throws(
+    () => calculate({ ...invoice([item('0', '10')]), customFields: [{ value: '999' }] }),
+    /Quantity must be a whole number from 1 to 1,000,000/,
+  );
   assert.equal(
-    calculate({ ...invoice([item('0', '10')]), customFields: [{ value: '999' }] }).total,
-    0,
+    calculate({ ...invoice([item('1', '10')]), customFields: [{ value: '999' }] }).total,
+    1000,
   );
 });
 const cases = [
   ['binary-sensitive cents', [item('3', '0.10')], '0', '0', 30, 0, 30],
-  ['zero quantity', [item('0', '0.01')], '0', '0', 0, 0, 0],
+  ['minimum quantity', [item('1', '0.01')], '0', '0', 1, 0, 1],
   ['maximum quantity', [item('1000000', '0.01')], '0', '0', 1000000, 0, 1000000],
   ['integer quantity with decimal price', [item('3', '19.99')], '0', '0', 5997, 0, 5997],
   ['half-cent tax rounds up', [item('1', '0.05')], '0', '10', 5, 1, 6],
@@ -93,8 +97,9 @@ test('empty, whitespace or omitted discount defaults to zero without allowing ne
   assert.throws(() => calculate(invoice([item('2', '50.00')], '-0.01', '10')));
 });
 test('quantity accepts only whole units within bounds without rounding or truncating', () => {
-  for (const value of ['0', '1', '3', '1000000']) assert.equal(quantityUnits(value), BigInt(value));
+  for (const value of ['1', '3', '1000000']) assert.equal(quantityUnits(value), BigInt(value));
   for (const value of [
+    '0',
     '0.5',
     '1.0',
     '1.5',

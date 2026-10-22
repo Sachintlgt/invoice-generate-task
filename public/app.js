@@ -1,5 +1,6 @@
-import { calculate, normalizeDiscount } from '/shared/calculations.js';
+import { calculate, normalizeDiscount, money } from '/shared/calculations.js';
 import { invoiceHTML, escapeHTML as e } from '/invoice-template.js';
+import { showToast } from '/toast.js';
 
 const $ = (s) => document.querySelector(s),
   form = $('#invoice-form');
@@ -15,6 +16,7 @@ let invoice = {
     name: 'Studio North',
     email: 'hello@studionorth.example',
     address: '128 Maple Street\nPortland, OR 97205',
+    logo: '',
   },
   customer: {
     name: 'Bloom & Co.',
@@ -39,7 +41,11 @@ let savedId = null,
   emailMode = 'preview',
   dirty = false,
   lastSavedContent = null,
-  loadBlocked = false;
+  loadBlocked = false,
+  recipientTouched = false;
+const MAX_LOGO_BYTES = 300 * 1024;
+// Requires a dot-separated domain with a 2+ character label (matches the server's stricter check).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /**
  * Return a stable snapshot of editable fields only. Server IDs, totals and timestamps
  * are excluded so an unchanged invoice is not saved again.
@@ -80,7 +86,7 @@ function rows() {
   $('#items').innerHTML = invoice.items
     .map(
       (r, n) =>
-        `<fieldset class="item-row"><legend>Item ${n + 1}</legend><label class="description">Description<input name="items.${n}.description" value="${e(r.description)}" required maxlength="500"></label><label>Quantity<input name="items.${n}.quantity" type="number" value="${e(r.quantity)}" min="0" max="1000000" step="1" inputmode="numeric" required></label><label>Price (USD)<input name="items.${n}.unitPrice" type="number" value="${e(r.unitPrice)}" min="0" max="100000000" step="0.01" required></label><button type="button" data-remove-item="${n}" class="remove" aria-label="Remove item ${n + 1}" ${invoice.items.length === 1 ? 'disabled' : ''}>×</button></fieldset>`,
+        `<fieldset class="item-row"><legend>Item ${n + 1}</legend><label class="description">Description<input name="items.${n}.description" value="${e(r.description)}" required maxlength="500"></label><label>Quantity<input name="items.${n}.quantity" type="number" value="${e(r.quantity)}" min="1" max="1000000" step="1" inputmode="numeric" required></label><label>Price (USD)<input name="items.${n}.unitPrice" type="number" value="${e(r.unitPrice)}" min="0" max="100000000" step="0.01" required></label><button type="button" data-remove-item="${n}" class="remove" aria-label="Remove item ${n + 1}" ${invoice.items.length === 1 ? 'disabled' : ''}>×</button></fieldset>`,
     )
     .join('');
   $('#custom-fields').innerHTML = invoice.customFields
@@ -102,16 +108,40 @@ function populate() {
     if (input.type === 'checkbox') input.checked = value;
     else input.value = value;
   }
+  renderLogoPreview();
+  recipientTouched = false;
   update();
+}
+/**
+ * Show or hide the small logo thumbnail and remove button for the current draft's logo.
+ */
+function renderLogoPreview() {
+  const has = !!invoice.business.logo;
+  $('#logo-preview').hidden = !has;
+  $('#logo-thumb').hidden = !has;
+  $('#logo-thumb').src = has ? invoice.business.logo : '';
+  $('#logo-broken-note').hidden = true;
+}
+// Defense in depth: if a saved logo ever fails to decode, show a clear message instead
+// of the browser's broken-image icon; Remove logo stays available either way.
+$('#logo-thumb').addEventListener('error', () => {
+  if (!invoice.business.logo) return;
+  $('#logo-thumb').hidden = true;
+  $('#logo-broken-note').hidden = false;
+});
+/**
+ * Default the recipient field to the customer's billing email until the user edits it
+ * directly; once edited, further customer-email changes no longer overwrite their choice.
+ */
+function syncRecipientDefault() {
+  if (!recipientTouched) $('#recipient-email').value = invoice.customer.email;
 }
 /**
  * Record unsaved edits for status feedback and the before-unload warning.
  */
 function markDirty() {
   dirty = true;
-  $('#status').textContent = savedId
-    ? 'Unsaved changes to this saved invoice.'
-    : 'New invoice · Unsaved changes.';
+  status(savedId ? 'Unsaved changes to this saved invoice.' : 'New invoice · Unsaved changes.');
 }
 /**
  * Choose the invoice to open: an explicit New invoice URL overrides remembered state,
@@ -145,10 +175,25 @@ function syncURL() {
 }
 /**
  * Show or clear the accessible error region without interpreting the message as HTML.
+ * Also raises a top-right toast, but only when the message is new — update() re-runs
+ * this on every keystroke, and a lingering validation error must not toast repeatedly.
  */
+let lastToastedError = '';
 function error(message) {
   $('#error').hidden = !message;
   $('#error').textContent = message;
+  if (message && message !== lastToastedError) showToast(message, { kind: 'error' });
+  lastToastedError = message;
+}
+/**
+ * Set the status line's text and, optionally, a visual success/failure tone so an
+ * outcome (like a send result) is never mistaken for a leftover unrelated message.
+ */
+function status(message, tone) {
+  $('#status').textContent = message;
+  $('#status').classList.remove('status-success', 'status-failure');
+  if (tone) $('#status').classList.add(`status-${tone}`);
+  if (tone === 'failure') showToast(message, { kind: 'error' });
 }
 /**
  * Validate current quantities and required fields, then recalculate and render the preview.
@@ -156,6 +201,7 @@ function error(message) {
  */
 function update() {
   read();
+  syncRecipientDefault();
   for (const input of form.querySelectorAll(
     'input[required]:not([type="number"]):not([type="date"])',
   ))
@@ -164,10 +210,22 @@ function update() {
     );
   for (const input of form.querySelectorAll('[name$=".quantity"]'))
     input.setCustomValidity(
-      /^\d{1,9}$/.test(input.value) && Number(input.value) <= 1000000
+      /^\d{1,9}$/.test(input.value) && Number(input.value) >= 1 && Number(input.value) <= 1000000
         ? ''
-        : 'Quantity must be a whole number from 0 to 1,000,000.',
+        : 'Quantity must be a whole number from 1 to 1,000,000.',
     );
+  // Browsers accept far looser strings (e.g. "a@b") as type="email"; this mirrors the
+  // server's stricter shape so a mismatch surfaces here instead of after a round trip.
+  // Required-but-empty is left to the required-field loop above.
+  for (const input of form.querySelectorAll('input[type="email"]')) {
+    const value = input.value.trim();
+    if (!value) continue;
+    input.setCustomValidity(
+      EMAIL_RE.test(value) && value.length <= 254
+        ? ''
+        : 'Enter a valid email address, like name@example.com.',
+    );
+  }
   $('#print').disabled = true;
   try {
     invoice.totals = calculate(invoice);
@@ -185,13 +243,23 @@ function update() {
     invoice.dueDate < invoice.issueDate ? 'Due date must be on or after issue date.' : '',
   );
 }
-form.addEventListener('input', () => {
+// The recipient field is send-time input, not saved invoice content: keep it out of the
+// dirty/content tracking that governs Save and the unsaved-changes warning.
+form.addEventListener('input', (event) => {
+  if (event.target.id === 'recipient-email') return;
   markDirty();
   update();
 });
-form.addEventListener('change', () => {
+form.addEventListener('change', (event) => {
+  // The logo input manages its own validation, dirty-tracking and preview refresh
+  // (including rejecting a file without clobbering its own error message).
+  if (event.target.id === 'recipient-email' || event.target.id === 'logo-input') return;
   markDirty();
   update();
+});
+$('#recipient-email').addEventListener('input', () => {
+  recipientTouched = true;
+  update(); // Live format feedback only; recipient is excluded from dirty/content tracking above.
 });
 form.elements.namedItem('discount').addEventListener('blur', (event) => {
   if (event.target.value === '' && !event.target.validity.badInput) {
@@ -229,6 +297,43 @@ form.addEventListener('click', (event) => {
   update();
   (item !== undefined ? $('#add-item') : $('#add-field')).focus();
 });
+/**
+ * Read a chosen file into the business logo field. Validate type and size client-side for
+ * fast feedback; the server independently re-validates the same constraints as the authority.
+ */
+$('#logo-input').addEventListener('change', () => {
+  const file = $('#logo-input').files[0];
+  $('#logo-input').value = '';
+  if (!file) return;
+  if (!['image/png', 'image/jpeg'].includes(file.type))
+    return error('Logo must be a PNG or JPEG image.');
+  if (file.size > MAX_LOGO_BYTES) return error('Logo must be 300KB or smaller.');
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    // A file can report an image MIME type by extension alone without being a real,
+    // decodable image (e.g. a renamed or corrupted file) — confirm it actually decodes
+    // before accepting it, so a broken logo never silently reaches Save, the PDF or email.
+    const probe = new Image();
+    probe.onload = () => {
+      invoice.business.logo = dataUrl;
+      renderLogoPreview();
+      markDirty();
+      update();
+    };
+    probe.onerror = () =>
+      error("This file doesn't appear to be a valid PNG or JPEG image. Try a different file.");
+    probe.src = dataUrl;
+  };
+  reader.onerror = () => error('Could not read the selected image.');
+  reader.readAsDataURL(file);
+});
+$('#logo-remove').onclick = () => {
+  invoice.business.logo = '';
+  renderLogoPreview();
+  markDirty();
+  update();
+};
 /**
  * Send same-origin JSON requests and surface server validation issues to the editor.
  * Reject failed responses so callers never mark unsuccessful operations as saved.
@@ -275,7 +380,7 @@ async function save() {
   read();
   if (savedId && contentKey() === lastSavedContent) {
     dirty = false;
-    $('#status').textContent = `Already saved · Invoice ID: ${savedId}`;
+    status(`Already saved · Invoice ID: ${savedId}`);
     return invoice;
   }
   const result = await api(
@@ -290,7 +395,7 @@ async function save() {
   dirty = false;
   $('#load-id').value = savedId;
   syncURL();
-  $('#status').textContent = `Saved changes to ${invoice.number} · Invoice ID: ${savedId}`;
+  status(`Saved changes to ${invoice.number} · Invoice ID: ${savedId}`);
   window.dispatchEvent(new Event('invoice-saved'));
   return result;
 }
@@ -316,7 +421,7 @@ async function action(fn) {
     if (loadBlocked) {
       $('#editor-mode').textContent =
         'Invoice unavailable · Reopen from Saved invoices or start a New invoice.';
-      $('#status').textContent = 'No invoice was created or overwritten.';
+      status('No invoice was created or overwritten.', 'failure');
     }
     $('#error').focus();
   } finally {
@@ -330,12 +435,38 @@ form.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!busy && valid()) action(save);
 });
+/**
+ * Show the recipient/invoice summary and require an explicit confirmation before any send,
+ * whether it delivers over SMTP or writes a local preview.
+ */
 $('#email').onclick = () => {
-  if (!busy && valid())
-    action(async () => {
+  if (busy || !valid()) return;
+  // Match the dialog's wording to what will actually happen: preview mode never emails anyone.
+  if (emailMode === 'smtp') {
+    $('#send-confirm-title').textContent = 'Send this invoice?';
+    $('#send-confirm-desc').textContent =
+      'This saves the invoice, then emails it to the address below.';
+    $('#send-confirm-button').textContent = 'Send email';
+  } else {
+    $('#send-confirm-title').textContent = 'Preview this invoice email?';
+    $('#send-confirm-desc').textContent =
+      'This saves the invoice, then saves a local preview of the email below. No email is actually sent.';
+    $('#send-confirm-button').textContent = 'Create preview';
+  }
+  $('#confirm-number').textContent = invoice.number;
+  $('#confirm-total').textContent = `${money(invoice.totals.total)} USD`;
+  $('#confirm-recipient').textContent = $('#recipient-email').value.trim();
+  $('#send-confirm').showModal();
+};
+$('#send-cancel').onclick = () => $('#send-confirm').close();
+$('#send-confirm-button').onclick = () => {
+  $('#send-confirm').close();
+  action(async () => {
+    const recipientEmail = $('#recipient-email').value.trim();
+    try {
       await save();
-      const result = await api(`/api/invoices/${savedId}/email`, 'POST', {});
-      $('#status').textContent = result.message;
+      const result = await api(`/api/invoices/${savedId}/email`, 'POST', { recipientEmail });
+      status(result.message, 'success');
       if (result.logUrl) {
         const link = document.createElement('a');
         link.href = result.logUrl;
@@ -344,7 +475,12 @@ $('#email').onclick = () => {
         link.rel = 'noopener';
         $('#status').append(link);
       }
-    });
+    } catch (err) {
+      // Leave no ambiguity: a failed send must not look like the earlier "Saved changes" status.
+      status(`Email not sent: ${err.message}`, 'failure');
+      throw err; // action() still shows/focuses the accessible error region.
+    }
+  });
 };
 $('#print').onclick = () => {
   if (valid()) window.print();
@@ -366,8 +502,7 @@ async function load(id, { initial = false } = {}) {
   loadBlocked = false;
   syncURL();
   $('#load-id').value = savedId;
-  $('#status').textContent =
-    `Opened invoice ${invoice.number} · Add or edit items, then Save changes.`;
+  status(`Opened invoice ${invoice.number} · Add or edit items, then Save changes.`);
 }
 $('#load').onclick = () => action(() => load($('#load-id').value.trim()));
 window.addEventListener('beforeunload', (event) => {
@@ -380,10 +515,10 @@ populate();
 api('/api/config')
   .then((config) => {
     emailMode = config.emailMode;
-    $('#email').textContent = emailMode === 'smtp' ? 'Send test email' : 'Preview email';
+    $('#email').textContent = emailMode === 'smtp' ? 'Send email' : 'Preview email';
     $('#email-note').textContent =
       emailMode === 'smtp'
-        ? 'Includes an invoice PDF attachment. Email goes only to the server-configured test address.'
+        ? 'Includes an invoice PDF attachment, sent to the recipient entered below.'
         : 'Preview mode: email HTML is saved locally; nothing is sent.';
   })
   .catch(() => {
@@ -391,6 +526,4 @@ api('/api/config')
   });
 const initialId = initialInvoiceId();
 if (initialId) action(() => load(initialId, { initial: true }));
-else
-  $('#status').textContent =
-    'New invoice · Save creates a new invoice. Open a saved invoice to update it.';
+else status('New invoice · Save creates a new invoice. Open a saved invoice to update it.');

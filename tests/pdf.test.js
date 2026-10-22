@@ -47,3 +47,23 @@ test('PDF creation rejects invalid totals before sending', async () => {
     /Discount cannot exceed subtotal/,
   );
 });
+const TINY_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+test('a business logo renders into the PDF without changing its page count', async () => {
+  const withLogo = { ...fixture(), business: { ...fixture().business, logo: TINY_PNG } };
+  const pdf = await invoicePDF(withLogo);
+  assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));
+  assert.equal(countPages(pdf), 1);
+  // PDFKit embeds raster images as XObjects; confirm one was written into the PDF.
+  assert.match(pdf.toString('latin1'), /\/Subtype\s*\/Image/);
+});
+test('a corrupt logo is skipped rather than failing PDF generation', async () => {
+  const corrupt = {
+    ...fixture(),
+    business: { ...fixture().business, logo: 'data:image/png;base64,not-a-real-image' },
+  };
+  const pdf = await invoicePDF(corrupt);
+  assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  assert.ok(pdf.toString('latin1').trimEnd().endsWith('%%EOF'));
+});
